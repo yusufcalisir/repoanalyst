@@ -3440,6 +3440,12 @@ func main() {
 	// Analysis
 	http.HandleFunc("/api/analysis/refresh", corsMiddleware(refreshAnalysis))
 
+	// Health check endpoint for cron jobs (lightweight, no DB load)
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	// Dynamic port for deployment
 	port := os.Getenv("PORT")
 	if port == "" {
