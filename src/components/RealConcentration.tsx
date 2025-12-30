@@ -65,12 +65,17 @@ interface ConcentrationAnalysis {
 
 interface Props {
     projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
 }
 
-export default function RealConcentration({ projectId }: Props) {
+export default function RealConcentration({ projectId, onLoadingChange }: Props) {
     const [data, setData] = useState<ConcentrationAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     useEffect(() => {
         fetchConcentration();

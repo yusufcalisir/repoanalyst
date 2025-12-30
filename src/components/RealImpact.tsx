@@ -46,13 +46,18 @@ interface ImpactAnalysis {
 
 interface Props {
     projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
 }
 
-export default function RealImpact({ projectId }: Props) {
+export default function RealImpact({ projectId, onLoadingChange }: Props) {
     const [impact, setImpact] = useState<ImpactAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [expandedUnit, setExpandedUnit] = useState<string | null>(null);
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     useEffect(() => {
         fetchImpact();

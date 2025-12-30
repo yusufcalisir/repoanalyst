@@ -14,9 +14,9 @@ export default {
                 muted: "#71717a",
                 risk: {
                     low: "#3b82f6",
-                    med: "#f59e0b",
+                    medium: "#f59e0b",
                     high: "#f97316",
-                    crit: "#ef4444",
+                    critical: "#ef4444",
                 },
                 health: {
                     good: "#10b981",

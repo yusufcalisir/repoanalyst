@@ -2,9 +2,9 @@
 
 <div align="center">
 
-## 🚀 **[LAUNCH DEMO](https://risk-surface.vercel.app/)** 🚀
+## 🚀 **[LAUNCH DEMO](#)** 🚀
 
-[![Live](https://img.shields.io/badge/🔥_LIVE_NOW-risk--surface.vercel.app-ff6b6b?style=for-the-badge)](https://risk-surface.vercel.app/)
+[![Live](https://img.shields.io/badge/🔥_LIVE_NOW-RiskSurface-ff6b6b?style=for-the-badge)](#)
 
 </div>
 

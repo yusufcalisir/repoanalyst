@@ -118,6 +118,27 @@ export default function App() {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isAnalysisReady, setIsAnalysisReady] = useState(true);
+    const [isTabLoading, setIsTabLoading] = useState(false);
+
+    // Tab-level cache: { "owner/repo": { "dashboard": data, "trajectory": data, ... } }
+    const [tabCache, setTabCache] = useState<Record<string, Record<string, unknown>>>({});
+
+    // Cache update callback for tab components
+    const handleCacheUpdate = useCallback((projectId: string, tabName: string, data: unknown) => {
+        setTabCache(prev => ({
+            ...prev,
+            [projectId]: {
+                ...(prev[projectId] || {}),
+                [tabName]: data
+            }
+        }));
+    }, []);
+
+    // Get cached data for a specific project/tab
+    const getCachedData = useCallback((projectId: string, tabName: string) => {
+        return tabCache[projectId]?.[tabName];
+    }, [tabCache]);
+
 
     // Scroll reset on navigation (Tab or Project change)
     useEffect(() => {
@@ -132,7 +153,7 @@ export default function App() {
         if (path === '/' || path === '/projects') {
             setActiveTab('projects');
         } else {
-            // Parse /{owner}/{repo}/{tab} format (e.g., /yusufcalisir/RiskSurface/overview)
+            // Parse /{owner}/{repo}/{tab} format (e.g., /owner/repo/overview)
             const parts = path.split('/').filter(Boolean);
             if (parts.length >= 3) {
                 // owner/repo/tab format
@@ -311,7 +332,12 @@ export default function App() {
         }
         setAnalyzingProject(null);
         setIsAnalysisReady(true);
+        setIsTabLoading(false);
     };
+
+    const handleTabLoadingChange = useCallback((loading: boolean) => {
+        setIsTabLoading(loading);
+    }, []);
 
     // Loading state
     if (isCheckingConnection) {
@@ -496,7 +522,7 @@ export default function App() {
                 <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-surface/30 backdrop-blur-md shrink-0 z-40">
                     <div className="flex items-center gap-3">
                         <div className="flex flex-col min-w-0">
-                            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.15em] md:tracking-[0.2em] text-white/30 leading-none mb-1">
+                            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] text-white/20 mb-0.5">
                                 {activeTab === 'projects' ? 'Fleet Context' : (currentProject ? 'Project Active' : 'System')}
                             </span>
                             <div className="flex items-baseline gap-2 min-w-0">
@@ -540,8 +566,8 @@ export default function App() {
                     ref={contentRef}
                     className={cn(
                         "flex-1 custom-scrollbar flex flex-col",
-                        isAnalysisReady ? "overflow-y-auto" : "overflow-hidden",
-                        (connection || activeTab !== 'projects') ? "p-4 md:p-8" : "p-4 md:px-8 md:pt-0 md:pb-2"
+                        (isAnalysisReady && !isTabLoading) ? "overflow-y-auto" : "overflow-hidden",
+                        (connection || activeTab !== 'projects') ? "p-4 md:p-8 pb-20 md:pb-8" : "p-4 md:px-8 md:pt-0 pb-20 md:pb-2"
                     )}
                 >
                     <AnimatePresence mode="wait">
@@ -554,7 +580,7 @@ export default function App() {
                                 transition={{ duration: 0.2 }}
                                 className={cn(
                                     "max-w-[1400px] mx-auto w-full",
-                                    (connection || activeTab !== 'projects') ? "space-y-8 md:space-y-12 pb-8" : "w-full"
+                                    (connection || activeTab !== 'projects') ? "space-y-8 md:space-y-12 pb-4" : "w-full pb-4"
                                 )}
                             >
                                 <ErrorBoundary key={`eb-${activeTab}-${projectVersion}`}>
@@ -569,25 +595,25 @@ export default function App() {
                                         />
                                     )}
                                     {activeTab === 'analysis' && selectedProject && (
-                                        <RealDashboard key={`dashboard-${projectVersion}`} projectId={selectedProject} />
+                                        <RealDashboard key={`dashboard-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} onTabChange={setActiveTab} />
                                     )}
                                     {activeTab === 'risk-map' && selectedProject && (
-                                        <RealTopology key={`topology-${projectVersion}`} projectId={selectedProject} />
+                                        <RealTopology key={`topology-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                     {activeTab === 'history' && selectedProject && (
-                                        <RealTrajectory key={`trajectory-${projectVersion}`} projectId={selectedProject} />
+                                        <RealTrajectory key={`trajectory-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                     {activeTab === 'impact' && selectedProject && (
-                                        <RealImpact key={`impact-${projectVersion}`} projectId={selectedProject} />
+                                        <RealImpact key={`impact-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                     {activeTab === 'dependencies' && selectedProject && (
-                                        <RealDependencies key={`deps-${projectVersion}`} projectId={selectedProject} />
+                                        <RealDependencies key={`deps-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                     {activeTab === 'concentration' && selectedProject && (
-                                        <RealConcentration key={`concentration-${projectVersion}`} projectId={selectedProject} />
+                                        <RealConcentration key={`concentration-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                     {activeTab === 'temporal' && selectedProject && (
-                                        <RealTemporal key={`temporal-${projectVersion}`} projectId={selectedProject} />
+                                        <RealTemporal key={`temporal-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                 </ErrorBoundary>
                             </motion.div>
@@ -604,15 +630,15 @@ export default function App() {
                     </AnimatePresence>
 
                     {/* Copyright Footer - Hidden while loading */}
-                    {isAnalysisReady && (
+                    {(isAnalysisReady && !isTabLoading) && (
                         <footer className="text-center py-1 mt-auto opacity-30 hover:opacity-100 transition-opacity">
                             <a
-                                href="https://github.com/yusufcalisir/RiskSurface"
+                                href="https://github.com/repository/RiskSurface"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[8px] text-muted hover:text-white transition-colors uppercase tracking-widest font-black"
                             >
-                                © 2025 RiskSurface - Made by Yusuf Çalışır
+                                © 2025 RiskSurface - Made by Engineering Team
                             </a>
                         </footer>
                     )}
@@ -740,10 +766,10 @@ function TacticalLoader() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 1.2, ease: "easeOut" }}
-                    className="relative mb-12"
+                    className="relative mb-12 w-full max-w-lg px-6"
                 >
-                    <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 rounded-2xl bg-risk-high/10 border border-risk-high/20 flex items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-center md:text-left">
+                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-risk-high/10 border border-risk-high/20 flex items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(239,68,68,0.1)] shrink-0">
                             <motion.div
                                 animate={{
                                     height: ["20%", "70%", "40%", "90%", "30%"],
@@ -751,9 +777,10 @@ function TacticalLoader() {
                                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                                 className="absolute inset-x-0 bottom-0 bg-risk-high/40"
                             />
-                            <Activity size={32} className="text-risk-high relative z-10 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                            <Activity size={24} className="text-risk-high relative z-10 md:hidden" />
+                            <Activity size={32} className="text-risk-high relative z-10 hidden md:block drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
                         </div>
-                        <h1 className="text-5xl md:text-7xl font-black tracking-[0.25em] text-white selection:bg-risk-high/30">
+                        <h1 className="text-3xl md:text-7xl font-black tracking-[0.1em] md:tracking-[0.25em] text-white selection:bg-risk-high/30 leading-none">
                             RISKSURFACE
                         </h1>
                     </div>
@@ -762,24 +789,24 @@ function TacticalLoader() {
                     <motion.div
                         animate={{ x: ["-100%", "250%"] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "linear", repeatDelay: 1 }}
-                        className="absolute inset-x-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
+                        className="absolute inset-x-0 top-0 bottom-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none hidden md:block"
                     />
                 </motion.div>
 
                 {/* Status Section */}
-                <div className="flex flex-col items-center gap-4">
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center gap-4 w-full px-6 text-center">
+                    <div className="flex items-center justify-center gap-3">
                         <motion.div
                             animate={{ opacity: [0.4, 1, 0.4] }}
                             transition={{ duration: 2, repeat: Infinity }}
-                            className="w-2 h-2 rounded-full bg-risk-high shadow-[0_0_10px_rgba(239,68,68,0.8)]"
+                            className="w-2 h-2 rounded-full bg-risk-high shadow-[0_0_10px_rgba(239,68,68,0.8)] shrink-0"
                         />
-                        <span className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 animate-pulse">
+                        <span className="text-[10px] md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.4em] text-white/40 animate-pulse">
                             Initializing Architectural Intelligence Engine
                         </span>
                     </div>
 
-                    <div className="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden relative border border-white/5">
+                    <div className="w-48 md:w-64 h-1.5 bg-white/5 rounded-full overflow-hidden relative border border-white/5">
                         <motion.div
                             initial={{ width: "0%" }}
                             animate={{ width: "100%" }}
@@ -790,18 +817,18 @@ function TacticalLoader() {
                 </div>
 
                 {/* Tactical Overlays */}
-                <div className="absolute -top-40 -left-40 w-80 h-80 border border-white/[0.01] rounded-full" />
-                <div className="absolute -bottom-40 -right-40 w-80 h-80 border border-white/[0.01] rounded-full" />
+                <div className="absolute -top-40 -left-40 w-80 h-80 border border-white/[0.01] rounded-full hidden md:block" />
+                <div className="absolute -bottom-40 -right-40 w-80 h-80 border border-white/[0.01] rounded-full hidden md:block" />
             </div>
 
             {/* Bottom Version Tag */}
-            <div className="absolute bottom-10 flex flex-col items-center gap-2">
-                <div className="text-[9px] font-black tracking-[0.5em] text-white/20 uppercase">
+            <div className="absolute bottom-10 flex flex-col items-center gap-2 w-full px-6 text-center">
+                <div className="text-[8px] md:text-[9px] font-black tracking-[0.2em] md:tracking-[0.5em] text-white/20 uppercase">
                     System Core v1.1.2 // Production Ready
                 </div>
-                <div className="flex gap-4 opacity-10">
-                    <div className="h-[1px] w-12 bg-white" />
-                    <div className="h-[1px] w-12 bg-white" />
+                <div className="flex gap-4 opacity-10 justify-center">
+                    <div className="h-[1px] w-8 md:w-12 bg-white" />
+                    <div className="h-[1px] w-8 md:w-12 bg-white" />
                 </div>
             </div>
         </div>

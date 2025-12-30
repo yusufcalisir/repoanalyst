@@ -43,14 +43,19 @@ type TimeWindow = '7d' | '30d' | 'all';
 
 interface Props {
     projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
 }
 
-export default function RealTrajectory({ projectId }: Props) {
+export default function RealTrajectory({ projectId, onLoadingChange }: Props) {
     const [trajectory, setTrajectory] = useState<TrajectoryAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [timeWindow, setTimeWindow] = useState<TimeWindow>('all');
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     useEffect(() => {
         fetchTrajectory();

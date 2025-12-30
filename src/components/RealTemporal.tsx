@@ -35,13 +35,18 @@ interface TemporalAnalysis {
 
 interface Props {
     projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
 }
 
-export default function RealTemporal({ projectId }: Props) {
+export default function RealTemporal({ projectId, onLoadingChange }: Props) {
     const [data, setData] = useState<TemporalAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [filter, setFilter] = useState('');
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     useEffect(() => {
         fetchTemporal();
@@ -207,24 +212,24 @@ export default function RealTemporal({ projectId }: Props) {
                 </AnimatePresence>
             </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap items-center justify-center gap-8 py-6 border-t border-white/5">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-risk-high/10 flex items-center justify-center">
+            {/* Legend - Responsive Aligned Layout */}
+            <div className="flex flex-col sm:flex-row items-center sm:justify-center gap-6 sm:gap-12 py-8 border-t border-white/5">
+                <div className="flex items-center gap-4 w-full sm:w-auto max-w-[280px] sm:max-w-none px-4 sm:px-0">
+                    <div className="w-10 h-10 rounded-xl bg-risk-high/10 flex items-center justify-center shrink-0 border border-risk-high/20">
                         <Zap className="text-risk-high" size={20} />
                     </div>
-                    <div>
-                        <div className="text-[10px] uppercase font-bold text-white text-left">Burst Hotspot</div>
-                        <div className="text-[10px] text-white/40 text-left">High-frequency changes in short span</div>
+                    <div className="flex-1">
+                        <div className="text-[10px] uppercase font-black text-white text-left tracking-wider">Burst Hotspot</div>
+                        <div className="text-[10px] text-white/40 text-left leading-tight">High-frequency change volume</div>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-risk-medium/10 flex items-center justify-center">
+                <div className="flex items-center gap-4 w-full sm:w-auto max-w-[280px] sm:max-w-none px-4 sm:px-0">
+                    <div className="w-10 h-10 rounded-xl bg-risk-medium/10 flex items-center justify-center shrink-0 border border-risk-medium/20">
                         <Wind className="text-risk-medium" size={20} />
                     </div>
-                    <div>
-                        <div className="text-[10px] uppercase font-bold text-white text-left">Drift Hotspot</div>
-                        <div className="text-[10px] text-white/40 text-left">Repeated, sustained changes</div>
+                    <div className="flex-1">
+                        <div className="text-[10px] uppercase font-black text-white text-left tracking-wider">Drift Hotspot</div>
+                        <div className="text-[10px] text-white/40 text-left leading-tight">Sustained instability over time</div>
                     </div>
                 </div>
             </div>

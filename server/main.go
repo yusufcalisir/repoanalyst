@@ -158,6 +158,54 @@ type RepoAnalysis struct {
 	SecurityAnalysis  *SecurityConsistencyAnalysis `json:"securityAnalysis,omitempty"`
 }
 
+// ==================== PREDICTIVE ANALYTICS TYPES ====================
+
+type RiskProjection struct {
+	Available      bool    `json:"available"`
+	Reason         string  `json:"reason,omitempty"`
+	CurrentRisk    float64 `json:"currentRisk"`
+	ProjectedRisk  float64 `json:"projectedRisk"`  // 4-week projection
+	Trend          string  `json:"trend"`          // increasing, stable, decreasing
+	TrendMagnitude float64 `json:"trendMagnitude"` // weekly change rate
+	Confidence     float64 `json:"confidence"`     // 0-1 confidence score
+}
+
+type BusFactorWarning struct {
+	ModulePath       string  `json:"modulePath"`
+	ModuleName       string  `json:"moduleName"`
+	PrimaryOwner     string  `json:"primaryOwner"`
+	OwnershipPercent float64 `json:"ownershipPercent"`
+	Severity         string  `json:"severity"` // critical, high, medium
+	Recommendation   string  `json:"recommendation"`
+}
+
+type DependencyRecommendation struct {
+	Name       string `json:"name"`
+	CurrentVer string `json:"currentVersion"`
+	Action     string `json:"action"` // update, review, urgent-update
+	Reason     string `json:"reason"`
+	Severity   string `json:"severity"` // critical, high, medium, low
+}
+
+type ActionableRecommendation struct {
+	Type       string `json:"type"`   // refactor, review, redistribute, update
+	Target     string `json:"target"` // module/file path
+	TargetName string `json:"targetName"`
+	Reason     string `json:"reason"`
+	Severity   string `json:"severity"` // critical, high, medium, low
+	Impact     string `json:"impact"`   // description of potential impact
+}
+
+type PredictiveAnalysis struct {
+	Available                 bool                       `json:"available"`
+	Reason                    string                     `json:"reason,omitempty"`
+	GeneratedAt               time.Time                  `json:"generatedAt"`
+	RiskProjection            *RiskProjection            `json:"riskProjection"`
+	BusFactorWarnings         []BusFactorWarning         `json:"busFactorWarnings"`
+	DependencyRecommendations []DependencyRecommendation `json:"dependencyRecommendations"`
+	Recommendations           []ActionableRecommendation `json:"recommendations"`
+}
+
 // ==================== TRAJECTORY ANALYSIS TYPES ====================
 
 type TrajectorySnapshot struct {
@@ -331,6 +379,17 @@ type DependencyDetail struct {
 	Type    string `json:"type"`
 }
 
+// ManifestDependency represents a direct dependency from package.json, go.mod, or requirements.txt
+type ManifestDependency struct {
+	Name          string `json:"name"`
+	DeclaredVer   string `json:"declaredVersion"`
+	LatestVer     string `json:"latestVersion"`
+	Type          string `json:"type"`          // production | development | optional
+	Manifest      string `json:"manifest"`      // package.json | go.mod | requirements.txt
+	VersionHealth string `json:"versionHealth"` // up-to-date | minor-lag | major-lag | unknown
+	Language      string `json:"language"`      // npm | go | python
+}
+
 type CommitSummary struct {
 	SHA              string    `json:"sha"`
 	Message          string    `json:"message"`
@@ -482,11 +541,166 @@ type AppState struct {
 	SelectedProject string                   `json:"selectedProject"`
 }
 
+// ==================== ANALYSIS CACHE ====================
+
+type CacheEntry struct {
+	Data      interface{}
+	CachedAt  time.Time
+	ExpiresIn time.Duration
+}
+
+func (c *CacheEntry) IsValid() bool {
+	if c == nil {
+		return false
+	}
+	return time.Since(c.CachedAt) < c.ExpiresIn
+}
+
+type AnalysisCache struct {
+	mu            sync.RWMutex
+	dashboard     map[string]*CacheEntry
+	trajectory    map[string]*CacheEntry
+	impact        map[string]*CacheEntry
+	dependencies  map[string]*CacheEntry
+	concentration map[string]*CacheEntry
+	temporal      map[string]*CacheEntry
+	topology      map[string]*CacheEntry
+	tree          map[string]*CacheEntry
+}
+
+func NewAnalysisCache() *AnalysisCache {
+	return &AnalysisCache{
+		dashboard:     make(map[string]*CacheEntry),
+		trajectory:    make(map[string]*CacheEntry),
+		impact:        make(map[string]*CacheEntry),
+		dependencies:  make(map[string]*CacheEntry),
+		concentration: make(map[string]*CacheEntry),
+		temporal:      make(map[string]*CacheEntry),
+		topology:      make(map[string]*CacheEntry),
+		tree:          make(map[string]*CacheEntry),
+	}
+}
+
+func (ac *AnalysisCache) Get(tabName, projectKey string) (interface{}, bool) {
+	ac.mu.RLock()
+	defer ac.mu.RUnlock()
+
+	var cache map[string]*CacheEntry
+	switch tabName {
+	case "dashboard":
+		cache = ac.dashboard
+	case "trajectory":
+		cache = ac.trajectory
+	case "impact":
+		cache = ac.impact
+	case "dependencies":
+		cache = ac.dependencies
+	case "concentration":
+		cache = ac.concentration
+	case "temporal":
+		cache = ac.temporal
+	case "topology":
+		cache = ac.topology
+	case "tree":
+		cache = ac.tree
+	default:
+		return nil, false
+	}
+
+	entry, exists := cache[projectKey]
+	if !exists || !entry.IsValid() {
+		return nil, false
+	}
+	return entry.Data, true
+}
+
+// GetWithTimestamp returns cached data along with its timestamp for polling support
+func (ac *AnalysisCache) GetWithTimestamp(tabName, projectKey string) (interface{}, time.Time, bool) {
+	ac.mu.RLock()
+	defer ac.mu.RUnlock()
+
+	var cache map[string]*CacheEntry
+	switch tabName {
+	case "dashboard":
+		cache = ac.dashboard
+	case "trajectory":
+		cache = ac.trajectory
+	case "impact":
+		cache = ac.impact
+	case "dependencies":
+		cache = ac.dependencies
+	case "concentration":
+		cache = ac.concentration
+	case "temporal":
+		cache = ac.temporal
+	case "topology":
+		cache = ac.topology
+	case "tree":
+		cache = ac.tree
+	default:
+		return nil, time.Time{}, false
+	}
+
+	entry, exists := cache[projectKey]
+	if !exists || !entry.IsValid() {
+		return nil, time.Time{}, false
+	}
+	return entry.Data, entry.CachedAt, true
+}
+
+func (ac *AnalysisCache) Set(tabName, projectKey string, data interface{}, ttl time.Duration) {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	entry := &CacheEntry{
+		Data:      data,
+		CachedAt:  time.Now(),
+		ExpiresIn: ttl,
+	}
+
+	switch tabName {
+	case "dashboard":
+		ac.dashboard[projectKey] = entry
+	case "trajectory":
+		ac.trajectory[projectKey] = entry
+	case "impact":
+		ac.impact[projectKey] = entry
+	case "dependencies":
+		ac.dependencies[projectKey] = entry
+	case "concentration":
+		ac.concentration[projectKey] = entry
+	case "temporal":
+		ac.temporal[projectKey] = entry
+	case "topology":
+		ac.topology[projectKey] = entry
+	case "tree":
+		ac.tree[projectKey] = entry
+	}
+}
+
+func (ac *AnalysisCache) InvalidateProject(projectKey string) {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	delete(ac.dashboard, projectKey)
+	delete(ac.trajectory, projectKey)
+	delete(ac.impact, projectKey)
+	delete(ac.dependencies, projectKey)
+	delete(ac.concentration, projectKey)
+	delete(ac.temporal, projectKey)
+	delete(ac.topology, projectKey)
+	delete(ac.tree, projectKey)
+	log.Printf("[Cache] Invalidated all caches for project: %s", projectKey)
+}
+
+const CacheTTL = 5 * time.Minute
+
 var (
-	state       AppState
-	stateLock   sync.RWMutex
-	stateFile   = "state.json"
-	githubToken string // In-memory only, never persisted
+	state         AppState
+	stateLock     sync.RWMutex
+	stateFile     = "state.json"
+	githubToken   string // In-memory only, never persisted
+	analysisCache = NewAnalysisCache()
 )
 
 // ==================== GITHUB API CLIENT ====================
@@ -1082,10 +1296,25 @@ func analyzeRepository(client *GitHubClient, owner, repo, defaultBranch string) 
 func analyzeTrajectory(client *GitHubClient, owner, repo string) *TrajectoryAnalysis {
 	log.Printf("[Trajectory] Starting trajectory analysis for %s/%s", owner, repo)
 
-	// Fetch commit activity (weekly commits for 52 weeks)
-	commitActivity, err := client.GetCommitActivity(owner, repo)
-	if err != nil {
-		log.Printf("[Trajectory] Warning: Failed to fetch commit activity: %v", err)
+	// Parallel fetch: commit activity and code frequency
+	var wg sync.WaitGroup
+	var commitActivity []CommitActivityWeek
+	var codeFrequency []CodeFrequencyWeek
+	var errActivity, errFrequency error
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		commitActivity, errActivity = client.GetCommitActivity(owner, repo)
+	}()
+	go func() {
+		defer wg.Done()
+		codeFrequency, errFrequency = client.GetCodeFrequency(owner, repo)
+	}()
+	wg.Wait()
+
+	if errActivity != nil {
+		log.Printf("[Trajectory] Warning: Failed to fetch commit activity: %v", errActivity)
 		return &TrajectoryAnalysis{
 			Available: false,
 			Reason:    "Failed to fetch commit activity",
@@ -1093,10 +1322,8 @@ func analyzeTrajectory(client *GitHubClient, owner, repo string) *TrajectoryAnal
 		}
 	}
 
-	// Fetch code frequency (weekly additions/deletions)
-	codeFrequency, err := client.GetCodeFrequency(owner, repo)
-	if err != nil {
-		log.Printf("[Trajectory] Warning: Failed to fetch code frequency: %v", err)
+	if errFrequency != nil {
+		log.Printf("[Trajectory] Warning: Failed to fetch code frequency: %v", errFrequency)
 		// Continue without code frequency data
 		codeFrequency = []CodeFrequencyWeek{}
 	}
@@ -1565,18 +1792,40 @@ func analyzeDependencies(client *GitHubClient, owner, repo string, tree *GitHubT
 		}
 	}
 
-	// Process imports
+	// Parallel file content fetching with semaphore
+	type fileResult struct {
+		path    string
+		content []byte
+		ext     string
+	}
+
+	resultsChan := make(chan fileResult, len(sourceFiles))
+	sem := make(chan struct{}, 5) // 5 concurrent fetches
+
 	for _, file := range sourceFiles {
-		content, err := client.GetFileContent(owner, repo, file.Path)
-		if err != nil {
+		go func(f GitHubTreeNode) {
+			sem <- struct{}{}        // acquire
+			defer func() { <-sem }() // release
+			content, err := client.GetFileContent(owner, repo, f.Path)
+			if err != nil {
+				resultsChan <- fileResult{path: f.Path, content: nil, ext: strings.ToLower(filepath.Ext(f.Path))}
+				return
+			}
+			resultsChan <- fileResult{path: f.Path, content: content, ext: strings.ToLower(filepath.Ext(f.Path))}
+		}(file)
+	}
+
+	// Collect results and process imports
+	for range sourceFiles {
+		r := <-resultsChan
+		if r.content == nil {
 			continue
 		}
 
-		contentStr := string(content)
-		ext := strings.ToLower(filepath.Ext(file.Path))
+		contentStr := string(r.content)
 
 		var matches [][]string
-		switch ext {
+		switch r.ext {
 		case ".py":
 			matches = pyImportRe.FindAllStringSubmatch(contentStr, -1)
 		case ".js", ".jsx", ".ts", ".tsx":
@@ -1601,7 +1850,7 @@ func analyzeDependencies(client *GitHubClient, owner, repo string, tree *GitHubT
 			// Simple check for internal vs external
 			category := "external"
 			// Check if it looks like a local path (starts with . or matches a file in tree)
-			if strings.HasPrefix(imp, ".") || fileSet[imp] || fileSet[imp+ext] {
+			if strings.HasPrefix(imp, ".") || fileSet[imp] || fileSet[imp+r.ext] {
 				category = "internal"
 			}
 
@@ -1610,11 +1859,11 @@ func analyzeDependencies(client *GitHubClient, owner, repo string, tree *GitHubT
 				continue
 			}
 
-			if _, exists := nodes[file.Path]; !exists {
-				nodes[file.Path] = &DependencyNode{
-					ID:       file.Path,
-					Name:     filepath.Base(file.Path),
-					Language: strings.TrimPrefix(ext, "."),
+			if _, exists := nodes[r.path]; !exists {
+				nodes[r.path] = &DependencyNode{
+					ID:       r.path,
+					Name:     filepath.Base(r.path),
+					Language: strings.TrimPrefix(r.ext, "."),
 					Category: "internal",
 				}
 			}
@@ -1633,11 +1882,11 @@ func analyzeDependencies(client *GitHubClient, owner, repo string, tree *GitHubT
 			}
 
 			edges = append(edges, DependencyEdge{
-				Source:     file.Path,
+				Source:     r.path,
 				Target:     imp,
 				ImportLine: strings.TrimSpace(match[0]),
 			})
-			fanOut[file.Path]++
+			fanOut[r.path]++
 			fanIn[imp]++
 		}
 	}
@@ -1786,6 +2035,120 @@ func parseManifests(client *GitHubClient, owner, repo string, tree *GitHubTreeRe
 	return versions
 }
 
+// parseManifestsFull returns structured manifest dependencies with version health
+func parseManifestsFull(client *GitHubClient, owner, repo string, tree *GitHubTreeResponse) []ManifestDependency {
+	var deps []ManifestDependency
+
+	for _, node := range tree.Tree {
+		name := strings.ToLower(filepath.Base(node.Path))
+
+		if name == "package.json" {
+			content, err := client.GetFileContent(owner, repo, node.Path)
+			if err != nil || content == nil {
+				continue
+			}
+			var pkg struct {
+				Deps    map[string]string `json:"dependencies"`
+				DevDeps map[string]string `json:"devDependencies"`
+			}
+			if err := json.Unmarshal(content, &pkg); err == nil {
+				for k, v := range pkg.Deps {
+					latest := fetchLatestVersion(k, "npm")
+					deps = append(deps, ManifestDependency{
+						Name:          k,
+						DeclaredVer:   v,
+						LatestVer:     latest,
+						Type:          "production",
+						Manifest:      "package.json",
+						VersionHealth: compareVersions(v, latest),
+						Language:      "npm",
+					})
+				}
+				for k, v := range pkg.DevDeps {
+					latest := fetchLatestVersion(k, "npm")
+					deps = append(deps, ManifestDependency{
+						Name:          k,
+						DeclaredVer:   v,
+						LatestVer:     latest,
+						Type:          "development",
+						Manifest:      "package.json",
+						VersionHealth: compareVersions(v, latest),
+						Language:      "npm",
+					})
+				}
+			}
+		} else if name == "go.mod" {
+			content, err := client.GetFileContent(owner, repo, node.Path)
+			if err != nil || content == nil {
+				continue
+			}
+			lines := strings.Split(string(content), "\n")
+			inRequire := false
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "require (") || strings.HasPrefix(line, "require(") {
+					inRequire = true
+					continue
+				}
+				if inRequire && line == ")" {
+					inRequire = false
+					continue
+				}
+				if inRequire && line != "" && !strings.HasPrefix(line, "//") {
+					parts := strings.Fields(line)
+					if len(parts) >= 2 {
+						mod := parts[0]
+						ver := parts[1]
+						latest := fetchLatestVersion(mod, "go")
+						deps = append(deps, ManifestDependency{
+							Name:          mod,
+							DeclaredVer:   ver,
+							LatestVer:     latest,
+							Type:          "production",
+							Manifest:      "go.mod",
+							VersionHealth: compareVersions(ver, latest),
+							Language:      "go",
+						})
+					}
+				}
+			}
+		} else if name == "requirements.txt" {
+			content, err := client.GetFileContent(owner, repo, node.Path)
+			if err != nil || content == nil {
+				continue
+			}
+			lines := strings.Split(string(content), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				// Parse name==version, name>=version etc.
+				re := regexp.MustCompile(`^([a-zA-Z0-9_-]+)(==|>=|<=|~=|>|<)?(.*)$`)
+				if matches := re.FindStringSubmatch(line); matches != nil && len(matches) >= 2 {
+					pkgName := matches[1]
+					ver := ""
+					if len(matches) >= 4 {
+						ver = strings.TrimSpace(matches[3])
+					}
+					latest := fetchLatestVersion(pkgName, "python")
+					deps = append(deps, ManifestDependency{
+						Name:          pkgName,
+						DeclaredVer:   ver,
+						LatestVer:     latest,
+						Type:          "production",
+						Manifest:      "requirements.txt",
+						VersionHealth: compareVersions(ver, latest),
+						Language:      "python",
+					})
+				}
+			}
+		}
+	}
+
+	return deps
+}
+
 // fetchLatestVersion queries package registries for the latest available version
 // Returns the latest version string or empty if unavailable
 func fetchLatestVersion(pkgName, language string) string {
@@ -1919,15 +2282,31 @@ func analyzeConcentration(client *GitHubClient, owner, repo string) *Concentrati
 		limit = 20
 	}
 
+	// Parallel commit file fetching with semaphore
+	type commitFilesResult struct {
+		files []string
+		err   error
+	}
+
+	resultsChan := make(chan commitFilesResult, limit)
+	sem := make(chan struct{}, 5) // 5 concurrent fetches
+
 	for i := 0; i < limit; i++ {
-		sha := commits[i].SHA
-		files, err := client.GetCommitFiles(owner, repo, sha)
-		if err != nil {
-			log.Printf("[Concentration] Warning: Failed to fetch files for commit %s: %v", sha, err)
+		go func(sha string) {
+			sem <- struct{}{}        // acquire
+			defer func() { <-sem }() // release
+			files, err := client.GetCommitFiles(owner, repo, sha)
+			resultsChan <- commitFilesResult{files: files, err: err}
+		}(commits[i].SHA)
+	}
+
+	// Collect results
+	for i := 0; i < limit; i++ {
+		r := <-resultsChan
+		if r.err != nil {
 			continue
 		}
-
-		for _, file := range files {
+		for _, file := range r.files {
 			churnMap[file]++
 		}
 		totalCommitsAnalyzed++
@@ -1993,6 +2372,248 @@ func analyzeConcentration(client *GitHubClient, owner, repo string) *Concentrati
 		ConcentrationIndex:   concentrationIndex,
 		Hotspots:             hotspots,
 	}
+}
+
+// ==================== PREDICTIVE ANALYTICS ENGINE ====================
+
+// analyzePredictions computes forward-looking metrics from real repository data
+func analyzePredictions(client *GitHubClient, owner, repo string, trajectory *TrajectoryAnalysis, concentration *ConcentrationAnalysis, deps *DependencyAnalysis) *PredictiveAnalysis {
+	log.Printf("[Predictions] Computing predictive analytics for %s/%s", owner, repo)
+
+	predictions := &PredictiveAnalysis{
+		Available:                 true,
+		GeneratedAt:               time.Now(),
+		BusFactorWarnings:         make([]BusFactorWarning, 0),
+		DependencyRecommendations: make([]DependencyRecommendation, 0),
+		Recommendations:           make([]ActionableRecommendation, 0),
+	}
+
+	// 1. Risk Projection from Trajectory
+	predictions.RiskProjection = computeRiskProjection(trajectory)
+
+	// 2. Bus Factor Warnings from Concentration
+	if concentration != nil && concentration.Available {
+		predictions.BusFactorWarnings = detectBusFactorWarnings(concentration)
+	}
+
+	// 3. Dependency Recommendations from Dependencies
+	if deps != nil && deps.Available {
+		predictions.DependencyRecommendations = generateDependencyRecommendations(deps)
+	}
+
+	// 4. Generate Actionable Recommendations
+	predictions.Recommendations = generateActionableRecommendations(predictions)
+
+	log.Printf("[Predictions] Generated %d bus factor warnings, %d dep recommendations, %d actions",
+		len(predictions.BusFactorWarnings),
+		len(predictions.DependencyRecommendations),
+		len(predictions.Recommendations))
+
+	return predictions
+}
+
+// computeRiskProjection uses linear regression on recent risk scores to project future risk
+func computeRiskProjection(trajectory *TrajectoryAnalysis) *RiskProjection {
+	if trajectory == nil || !trajectory.Available || len(trajectory.Snapshots) < 4 {
+		return &RiskProjection{
+			Available: false,
+			Reason:    "Not enough data for prediction (need at least 4 weeks)",
+		}
+	}
+
+	snapshots := trajectory.Snapshots
+	n := len(snapshots)
+
+	// Use last 8 weeks or all available if less
+	windowSize := 8
+	if n < windowSize {
+		windowSize = n
+	}
+	recentSnapshots := snapshots[n-windowSize:]
+
+	// Calculate current risk (average of last 2 weeks)
+	currentRisk := 0.0
+	for i := len(recentSnapshots) - 2; i < len(recentSnapshots); i++ {
+		if i >= 0 {
+			currentRisk += recentSnapshots[i].RiskScore
+		}
+	}
+	currentRisk /= 2
+
+	// Simple linear regression: y = mx + b
+	// Calculate trend (slope)
+	sumX, sumY, sumXY, sumX2 := 0.0, 0.0, 0.0, 0.0
+	for i, s := range recentSnapshots {
+		x := float64(i)
+		y := s.RiskScore
+		sumX += x
+		sumY += y
+		sumXY += x * y
+		sumX2 += x * x
+	}
+	nf := float64(len(recentSnapshots))
+	slope := (nf*sumXY - sumX*sumY) / (nf*sumX2 - sumX*sumX)
+
+	// Project 4 weeks ahead
+	projectedRisk := currentRisk + (slope * 4)
+	if projectedRisk < 0 {
+		projectedRisk = 0
+	}
+	if projectedRisk > 100 {
+		projectedRisk = 100
+	}
+
+	// Determine trend
+	trend := "stable"
+	if slope > 1.0 {
+		trend = "increasing"
+	} else if slope < -1.0 {
+		trend = "decreasing"
+	}
+
+	// Confidence based on data consistency
+	confidence := 0.7
+	if len(recentSnapshots) >= 8 {
+		confidence = 0.85
+	}
+
+	return &RiskProjection{
+		Available:      true,
+		CurrentRisk:    currentRisk,
+		ProjectedRisk:  projectedRisk,
+		Trend:          trend,
+		TrendMagnitude: slope,
+		Confidence:     confidence,
+	}
+}
+
+// detectBusFactorWarnings identifies modules with concentrated ownership
+func detectBusFactorWarnings(concentration *ConcentrationAnalysis) []BusFactorWarning {
+	warnings := make([]BusFactorWarning, 0)
+
+	// Use hotspots as proxy for critical modules
+	for _, hotspot := range concentration.Hotspots {
+		if hotspot.Percent > 20 { // High concentration in a single file/module
+			severity := "medium"
+			if hotspot.Percent > 40 {
+				severity = "high"
+			}
+			if hotspot.Percent > 60 {
+				severity = "critical"
+			}
+
+			warnings = append(warnings, BusFactorWarning{
+				ModulePath:       hotspot.Path,
+				ModuleName:       filepath.Base(hotspot.Path),
+				PrimaryOwner:     "Single maintainer", // We'd need contributor data for actual name
+				OwnershipPercent: hotspot.Percent,
+				Severity:         severity,
+				Recommendation:   fmt.Sprintf("Consider redistributing ownership of %s", filepath.Base(hotspot.Path)),
+			})
+		}
+	}
+
+	// Limit to top 5 warnings
+	if len(warnings) > 5 {
+		warnings = warnings[:5]
+	}
+
+	return warnings
+}
+
+// generateDependencyRecommendations analyzes dependencies for update recommendations
+func generateDependencyRecommendations(deps *DependencyAnalysis) []DependencyRecommendation {
+	recommendations := make([]DependencyRecommendation, 0)
+
+	for _, node := range deps.Nodes {
+		if node.Category != "external" {
+			continue
+		}
+
+		var action, reason, severity string
+
+		switch node.Lag {
+		case "major":
+			action = "urgent-update"
+			reason = "Major version behind - security risk"
+			severity = "critical"
+		case "minor":
+			action = "update"
+			reason = "Minor version behind"
+			severity = "high"
+		default:
+			continue // up-to-date or unknown, no recommendation
+		}
+
+		recommendations = append(recommendations, DependencyRecommendation{
+			Name:       node.Name,
+			CurrentVer: node.Version,
+			Action:     action,
+			Reason:     reason,
+			Severity:   severity,
+		})
+	}
+
+	// Limit to top 10 recommendations
+	if len(recommendations) > 10 {
+		recommendations = recommendations[:10]
+	}
+
+	return recommendations
+}
+
+// generateActionableRecommendations creates high-level recommendations from all predictions
+func generateActionableRecommendations(predictions *PredictiveAnalysis) []ActionableRecommendation {
+	recommendations := make([]ActionableRecommendation, 0)
+
+	// From risk projection
+	if predictions.RiskProjection != nil && predictions.RiskProjection.Available {
+		rp := predictions.RiskProjection
+		if rp.Trend == "increasing" && rp.ProjectedRisk > 60 {
+			recommendations = append(recommendations, ActionableRecommendation{
+				Type:       "refactor",
+				Target:     "high-churn-modules",
+				TargetName: "High-churn modules",
+				Reason:     fmt.Sprintf("Risk projected to increase from %.1f to %.1f", rp.CurrentRisk, rp.ProjectedRisk),
+				Severity:   "high",
+				Impact:     "Reduce technical debt accumulation",
+			})
+		}
+	}
+
+	// From bus factor warnings
+	for _, warning := range predictions.BusFactorWarnings {
+		if warning.Severity == "critical" {
+			recommendations = append(recommendations, ActionableRecommendation{
+				Type:       "redistribute",
+				Target:     warning.ModulePath,
+				TargetName: warning.ModuleName,
+				Reason:     fmt.Sprintf("%.1f%% ownership concentration", warning.OwnershipPercent),
+				Severity:   "critical",
+				Impact:     "Reduce single-point-of-failure risk",
+			})
+		}
+	}
+
+	// From dependency recommendations
+	criticalDeps := 0
+	for _, dep := range predictions.DependencyRecommendations {
+		if dep.Severity == "critical" {
+			criticalDeps++
+		}
+	}
+	if criticalDeps > 0 {
+		recommendations = append(recommendations, ActionableRecommendation{
+			Type:       "update",
+			Target:     "dependencies",
+			TargetName: "External dependencies",
+			Reason:     fmt.Sprintf("%d dependencies need urgent updates", criticalDeps),
+			Severity:   "critical",
+			Impact:     "Address potential security vulnerabilities",
+		})
+	}
+
+	return recommendations
 }
 
 // ==================== TEMPORAL HOTSPOT ANALYSIS ====================
@@ -3278,7 +3899,30 @@ func analysisDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Dashboard] Computing dashboard analysis for %s/%s", owner, repo)
+	projectKey := owner + "/" + repo
+
+	// Check for If-Modified-Since header for polling support
+	ifModifiedSince := r.Header.Get("If-Modified-Since")
+
+	// Check cache first with timestamp
+	if cached, cachedAt, ok := analysisCache.GetWithTimestamp("dashboard", projectKey); ok {
+		// If client sent If-Modified-Since, check if data changed
+		if ifModifiedSince != "" {
+			clientTime, err := time.Parse(time.RFC1123, ifModifiedSince)
+			if err == nil && !cachedAt.After(clientTime) {
+				// Data not modified since client's last request
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+		log.Printf("[Dashboard] Cache HIT for %s", projectKey)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Last-Modified", cachedAt.Format(time.RFC1123))
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	log.Printf("[Dashboard] Cache MISS - Computing dashboard analysis for %s", projectKey)
 	client := NewGitHubClient(githubToken)
 
 	// Dashboard needs: repo metadata, commits, activity heatmap, basic file stats
@@ -3380,12 +4024,17 @@ func analysisDashboard(w http.ResponseWriter, r *http.Request) {
 		analysis.DaysSinceLastPush = daysSincePush
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"selected": true,
 		"project":  foundRepo,
 		"analysis": analysis,
-	})
+	}
+
+	// Cache the response
+	analysisCache.Set("dashboard", projectKey, response, CacheTTL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func analysisTrajectory(w http.ResponseWriter, r *http.Request) {
@@ -3402,18 +4051,32 @@ func analysisTrajectory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Trajectory] Computing trajectory analysis for %s/%s", owner, repo)
+	projectKey := owner + "/" + repo
+
+	// Check cache first
+	if cached, ok := analysisCache.Get("trajectory", projectKey); ok {
+		log.Printf("[Trajectory] Cache HIT for %s", projectKey)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	log.Printf("[Trajectory] Cache MISS - Computing trajectory analysis for %s", projectKey)
 	client := NewGitHubClient(githubToken)
 	trajectory := analyzeTrajectory(client, owner, repo)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"selected": true,
 		"project":  foundRepo,
 		"analysis": map[string]interface{}{
 			"trajectory": trajectory,
 		},
-	})
+	}
+
+	analysisCache.Set("trajectory", projectKey, response, CacheTTL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func analysisDependencies(w http.ResponseWriter, r *http.Request) {
@@ -3430,19 +4093,38 @@ func analysisDependencies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Dependencies] Computing dependency analysis for %s/%s", owner, repo)
+	projectKey := owner + "/" + repo
+
+	// Check cache first
+	if cached, ok := analysisCache.Get("dependencies", projectKey); ok {
+		log.Printf("[Dependencies] Cache HIT for %s", projectKey)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	log.Printf("[Dependencies] Cache MISS - Computing dependency analysis for %s", projectKey)
 	client := NewGitHubClient(githubToken)
 	tree, _ := client.GetFileTree(owner, repo, branch)
 	deps := analyzeDependencies(client, owner, repo, tree, nil)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	// Parse manifest dependencies with version health
+	manifestDeps := parseManifestsFull(client, owner, repo, tree)
+	log.Printf("[Dependencies] Found %d manifest dependencies", len(manifestDeps))
+
+	response := map[string]interface{}{
 		"selected": true,
 		"project":  foundRepo,
 		"analysis": map[string]interface{}{
-			"deps": deps,
+			"deps":                 deps,
+			"manifestDependencies": manifestDeps,
 		},
-	})
+	}
+
+	analysisCache.Set("dependencies", projectKey, response, CacheTTL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func analysisConcentration(w http.ResponseWriter, r *http.Request) {
@@ -3459,7 +4141,17 @@ func analysisConcentration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Concentration] Computing concentration analysis for %s/%s", owner, repo)
+	projectKey := owner + "/" + repo
+
+	// Check cache first
+	if cached, ok := analysisCache.Get("concentration", projectKey); ok {
+		log.Printf("[Concentration] Cache HIT for %s", projectKey)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	log.Printf("[Concentration] Cache MISS - Computing concentration analysis for %s", projectKey)
 	client := NewGitHubClient(githubToken)
 
 	// Fetch tree for dependency analysis (needed for bus factor)
@@ -3477,14 +4169,18 @@ func analysisConcentration(w http.ResponseWriter, r *http.Request) {
 		concentration.OwnershipRisk = busFactor
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"selected": true,
 		"project":  foundRepo,
 		"analysis": map[string]interface{}{
 			"concentration": concentration,
 		},
-	})
+	}
+
+	analysisCache.Set("concentration", projectKey, response, CacheTTL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func analysisTemporal(w http.ResponseWriter, r *http.Request) {
@@ -3501,18 +4197,32 @@ func analysisTemporal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Temporal] Computing temporal analysis for %s/%s", owner, repo)
+	projectKey := owner + "/" + repo
+
+	// Check cache first
+	if cached, ok := analysisCache.Get("temporal", projectKey); ok {
+		log.Printf("[Temporal] Cache HIT for %s", projectKey)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	log.Printf("[Temporal] Cache MISS - Computing temporal analysis for %s", projectKey)
 	client := NewGitHubClient(githubToken)
 	temporal := analyzeTemporal(client, owner, repo)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"selected": true,
 		"project":  foundRepo,
 		"analysis": map[string]interface{}{
 			"temporal": temporal,
 		},
-	})
+	}
+
+	analysisCache.Set("temporal", projectKey, response, CacheTTL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func analysisImpact(w http.ResponseWriter, r *http.Request) {
@@ -3529,20 +4239,93 @@ func analysisImpact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Impact] Computing impact analysis for %s/%s", owner, repo)
+	projectKey := owner + "/" + repo
+
+	// Check cache first
+	if cached, ok := analysisCache.Get("impact", projectKey); ok {
+		log.Printf("[Impact] Cache HIT for %s", projectKey)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	log.Printf("[Impact] Cache MISS - Computing impact analysis for %s", projectKey)
 	client := NewGitHubClient(githubToken)
 	tree, _ := client.GetFileTree(owner, repo, branch)
 	topology := analyzeTopology(tree)
 	impact := analyzeImpact(topology, tree)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"selected": true,
 		"project":  foundRepo,
 		"analysis": map[string]interface{}{
 			"impact": impact,
 		},
-	})
+	}
+
+	analysisCache.Set("impact", projectKey, response, CacheTTL)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func analysisPredictions(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	owner, repo, branch, foundRepo, err := getSelectedProjectContext()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	log.Printf("[Predictions] Computing predictive analytics for %s", projectKey)
+
+	client := NewGitHubClient(githubToken)
+
+	// Fetch required data for predictions in parallel
+	var wg sync.WaitGroup
+	var trajectory *TrajectoryAnalysis
+	var concentration *ConcentrationAnalysis
+	var deps *DependencyAnalysis
+	var tree *GitHubTreeResponse
+
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		trajectory = analyzeTrajectory(client, owner, repo)
+	}()
+	go func() {
+		defer wg.Done()
+		concentration = analyzeConcentration(client, owner, repo)
+	}()
+	go func() {
+		defer wg.Done()
+		tree, _ = client.GetFileTree(owner, repo, branch)
+		deps = analyzeDependencies(client, owner, repo, tree, nil)
+	}()
+	go func() {
+		defer wg.Done()
+		// Placeholder for future parallelization
+	}()
+	wg.Wait()
+
+	// Compute predictions
+	predictions := analyzePredictions(client, owner, repo, trajectory, concentration, deps)
+
+	response := map[string]interface{}{
+		"selected":    true,
+		"project":     foundRepo,
+		"predictions": predictions,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func analysisBusFactor(w http.ResponseWriter, r *http.Request) {
@@ -3578,6 +4361,82 @@ func analysisBusFactor(w http.ResponseWriter, r *http.Request) {
 		"analysis": map[string]interface{}{
 			"concentration": concentration,
 			"busFactor":     busFactor,
+		},
+	})
+}
+
+// analysisTree returns the repository file tree structure
+func analysisTree(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	owner, repo, branch, foundRepo, err := getSelectedProjectContext()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	log.Printf("[Tree] Fetching repository tree for %s/%s", owner, repo)
+	client := NewGitHubClient(githubToken)
+	tree, err := client.GetFileTree(owner, repo, branch)
+
+	if err != nil || tree == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"selected": true,
+			"project":  foundRepo,
+			"analysis": map[string]interface{}{
+				"tree": map[string]interface{}{
+					"available": false,
+					"reason":    "Unable to fetch repository tree: " + err.Error(),
+				},
+			},
+		})
+		return
+	}
+
+	// Transform tree nodes to structured format
+	type TreeNode struct {
+		Path string `json:"path"`
+		Type string `json:"type"` // blob | tree
+		Size int    `json:"size"`
+	}
+
+	nodes := make([]TreeNode, 0, len(tree.Tree))
+	totalFiles := 0
+	totalDirs := 0
+
+	for _, node := range tree.Tree {
+		nodes = append(nodes, TreeNode{
+			Path: node.Path,
+			Type: node.Type,
+			Size: node.Size,
+		})
+		if node.Type == "blob" {
+			totalFiles++
+		} else if node.Type == "tree" {
+			totalDirs++
+		}
+	}
+
+	log.Printf("[Tree] Found %d files and %d directories", totalFiles, totalDirs)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"selected": true,
+		"project":  foundRepo,
+		"analysis": map[string]interface{}{
+			"tree": map[string]interface{}{
+				"available":  true,
+				"nodes":      nodes,
+				"totalFiles": totalFiles,
+				"totalDirs":  totalDirs,
+				"truncated":  tree.Truncated,
+			},
 		},
 	})
 }
@@ -4289,6 +5148,8 @@ func main() {
 	http.HandleFunc("/api/analysis/temporal", corsMiddleware(analysisTemporal))
 	http.HandleFunc("/api/analysis/impact", corsMiddleware(analysisImpact))
 	http.HandleFunc("/api/analysis/busfactor", corsMiddleware(analysisBusFactor))
+	http.HandleFunc("/api/analysis/tree", corsMiddleware(analysisTree))
+	http.HandleFunc("/api/analysis/predictions", corsMiddleware(analysisPredictions))
 
 	// Health check endpoint for cron jobs (lightweight, no DB load)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

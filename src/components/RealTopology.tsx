@@ -73,12 +73,17 @@ const languageColors: Record<string, string> = {
 
 interface Props {
     projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
 }
 
-export default function RealTopology({ projectId }: Props) {
+export default function RealTopology({ projectId, onLoadingChange }: Props) {
     const [topology, setTopology] = useState<TopologyAnalysis | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     useEffect(() => {
         fetchTopology();

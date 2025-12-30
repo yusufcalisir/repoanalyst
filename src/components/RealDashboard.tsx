@@ -9,6 +9,8 @@ import {
 import { API_BASE } from '../config';
 import ActivityHeatMap from './ActivityHeatMap';
 import ProjectContextHeader from './ProjectContextHeader';
+import RepositoryTree from './RepositoryTree';
+import RecommendationCard from './RecommendationCard';
 
 interface RepoMetadata {
     fullName: string;
@@ -154,14 +156,20 @@ interface Repository {
 
 interface Props {
     projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
+    onTabChange?: (tab: string) => void;
 }
 
-export default function RealDashboard({ projectId }: Props) {
+export default function RealDashboard({ projectId, onLoadingChange, onTabChange }: Props) {
     const [repo, setRepo] = useState<Repository | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const [refreshError, setRefreshError] = useState('');
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     const fetchAnalysis = async (retryCount = 0) => {
         const MAX_RETRIES = 3;
@@ -764,11 +772,12 @@ export default function RealDashboard({ projectId }: Props) {
                             )}
                         </div>
                     ) : (
-                        <div className="text-muted text-sm">No directory structure available</div>
+                        <RepositoryTree projectId={projectId} />
                     )}
                 </div>
 
                 <div className="flex flex-col gap-6 h-full">
+                    <RecommendationCard onTabChange={onTabChange} />
                     {/* File Extensions - Real Data */}
                     <div className="glass-panel rounded-2xl p-6">
                         <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2">
@@ -822,42 +831,6 @@ export default function RealDashboard({ projectId }: Props) {
                             </div>
                         ) : (
                             <div className="text-muted text-sm">No file type data available</div>
-                        )}
-                    </div>
-
-                    {/* Dependencies - Real Parsed Data */}
-                    <div className="glass-panel rounded-2xl p-6 h-full flex flex-col flex-1">
-                        <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2 shrink-0">
-                            <Package size={18} />
-                            Dependencies
-                            <span className="text-xs font-normal text-muted">
-                                ({analysis?.dependencyCount || 0} total - parsed from manifest files)
-                            </span>
-                        </h3>
-                        {analysis?.dependencies && analysis.dependencies.length > 0 ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 overflow-y-auto custom-scrollbar flex-1 min-h-0 content-start">
-                                {analysis.dependencies.map((dep, i) => (
-                                    <motion.div
-                                        key={`${dep.name}-${i}`}
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: i * 0.01 }}
-                                        className={`px-3 py-2 rounded-lg text-xs border ${dep.type === 'development'
-                                            ? 'bg-purple-500/10 border-purple-500/20'
-                                            : 'bg-white/5 border-white/10'
-                                            }`}
-                                    >
-                                        <div className="font-medium text-white truncate">{dep.name}</div>
-                                        <div className="text-muted text-[10px] truncate">
-                                            {dep.version || 'latest'} • {dep.type}
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-muted text-sm p-4 bg-white/5 rounded-lg text-center">
-                                No dependency manifest found (package.json, requirements.txt, or go.mod)
-                            </div>
                         )}
                     </div>
                 </div>

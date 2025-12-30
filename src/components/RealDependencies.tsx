@@ -8,7 +8,9 @@ import {
     ChevronUp,
     Circle,
     ArrowRight,
-    Code
+    Code,
+    Package,
+    CheckCircle
 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
 
@@ -48,15 +50,32 @@ interface DependencyAnalysis {
     maxFanIn: number;
 }
 
-interface Props {
-    projectId: string;
+// Direct dependencies from package.json, go.mod, requirements.txt
+interface ManifestDependency {
+    name: string;
+    declaredVersion: string;
+    latestVersion: string;
+    type: 'production' | 'development' | 'optional';
+    manifest: string;
+    versionHealth: 'up-to-date' | 'minor-lag' | 'major-lag' | 'unknown';
+    language: 'npm' | 'go' | 'python';
 }
 
-export default function RealDependencies({ projectId }: Props) {
+interface Props {
+    projectId: string;
+    onLoadingChange?: (loading: boolean) => void;
+}
+
+export default function RealDependencies({ projectId, onLoadingChange }: Props) {
     const [deps, setDeps] = useState<DependencyAnalysis | null>(null);
+    const [manifestDeps, setManifestDeps] = useState<ManifestDependency[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedNode, setSelectedNode] = useState<string | null>(null);
+
+    useEffect(() => {
+        onLoadingChange?.(loading);
+    }, [loading, onLoadingChange]);
 
     useEffect(() => {
         fetchDependencies();
@@ -65,6 +84,7 @@ export default function RealDependencies({ projectId }: Props) {
     const fetchDependencies = async () => {
         // Reset state to prevent stale data
         setDeps(null);
+        setManifestDeps([]);
         setError('');
         setLoading(true);
 
@@ -85,6 +105,11 @@ export default function RealDependencies({ projectId }: Props) {
                 setDeps(data.analysis.deps);
             } else {
                 setError('No dependency data available');
+            }
+
+            // Extract manifest dependencies (direct from package.json/go.mod)
+            if (data.analysis?.manifestDependencies) {
+                setManifestDeps(data.analysis.manifestDependencies);
             }
         } catch (err) {
             setError('Failed to fetch dependency data');
@@ -149,6 +174,95 @@ export default function RealDependencies({ projectId }: Props) {
                     </div>
                 );
             })()}
+
+            {/* Direct Manifest Dependencies */}
+            {manifestDeps.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6 border border-white/10">
+                    <div className="flex items-center gap-3 mb-6">
+                        <Package className="text-cyan-400" size={18} />
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">
+                            Manifest Dependencies ({manifestDeps.length})
+                        </h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                        <div className="hidden md:grid md:grid-cols-6 px-4 py-2 border-b border-white/5 text-[10px] uppercase font-bold text-white/20 tracking-widest">
+                            <div className="col-span-2">Package</div>
+                            <div>Versions</div>
+                            <div>Health</div>
+                            <div>Type</div>
+                            <div className="text-right">Source</div>
+                        </div>
+                        {manifestDeps.map((dep, i) => (
+                            <motion.div
+                                key={i}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.03 }}
+                                className="group relative bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 rounded-xl p-4 transition-all duration-300"
+                            >
+                                <div className="grid grid-cols-1 md:grid-cols-6 items-center gap-4">
+                                    {/* Package Info */}
+                                    <div className="md:col-span-2 min-w-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-white/5 border border-white/10 group-hover:scale-110 transition-transform">
+                                                <Package className="text-cyan-400/70" size={14} />
+                                            </div>
+                                            <div className="font-bold text-white text-base truncate pr-2" title={dep.name}>
+                                                {dep.name}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Version Group */}
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] uppercase font-bold text-white/20 md:hidden">Declared:</span>
+                                            <span className="font-mono text-xs text-white/60 bg-white/5 px-1.5 py-0.5 rounded leading-none">{dep.declaredVersion || 'any'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] uppercase font-bold text-white/20 md:hidden">Latest:</span>
+                                            <span className="font-mono text-xs text-cyan-400/40 px-1.5 py-0.5 rounded leading-none">{dep.latestVersion || '—'}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Health Badge */}
+                                    <div className="flex items-center">
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tight shadow-sm ${dep.versionHealth === 'up-to-date'
+                                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                            : dep.versionHealth === 'minor-lag'
+                                                ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                                : dep.versionHealth === 'major-lag'
+                                                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                    : 'bg-white/5 text-white/40 border border-white/10'
+                                            }`}>
+                                            {dep.versionHealth === 'up-to-date' && <CheckCircle size={10} className="shrink-0" />}
+                                            {dep.versionHealth}
+                                        </span>
+                                    </div>
+
+                                    {/* Type Badge */}
+                                    <div className="flex items-center">
+                                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter border ${dep.type === 'production'
+                                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                            : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                            }`}>
+                                            {dep.type}
+                                        </span>
+                                    </div>
+
+                                    {/* Source */}
+                                    <div className="md:text-right">
+                                        <span className="text-[10px] uppercase font-bold text-white/20 md:hidden mr-2">From:</span>
+                                        <span className="text-[10px] font-mono text-white/30 truncate group-hover:text-white/50 transition-colors">
+                                            {dep.manifest}
+                                        </span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Graph Visualization */}
             <div className="glass-panel rounded-2xl p-6 border border-white/10">
