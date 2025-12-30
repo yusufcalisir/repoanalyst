@@ -13,7 +13,8 @@ import {
     Github,
     LogOut,
     FolderKanban,
-    Loader2
+    Loader2,
+    Download
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -106,6 +107,7 @@ export default function App() {
     const [isAnalysisReady, setIsAnalysisReady] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isExportOpen, setIsExportOpen] = useState(false);
+    const [isMobileNavAtEnd, setIsMobileNavAtEnd] = useState(false);
 
     // Check GitHub connection on mount
     useEffect(() => {
@@ -141,6 +143,20 @@ export default function App() {
             setProjects(data || []);
         } catch (err) {
             console.error('Failed to fetch projects');
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await fetch(`${API_BASE}/api/github/disconnect`, { method: 'POST' });
+            setConnection(null);
+            setProjects([]);
+            setSelectedProject(null);
+            setAnalyzingProject(null);
+            setActiveTab('projects');
+            setIsMobileMenuOpen(false);
+        } catch (err) {
+            console.error('Logout failed');
         }
     };
 
@@ -243,8 +259,9 @@ export default function App() {
                 <button
                     onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                     className="hidden md:flex p-1.5 rounded-md hover:bg-white/5 transition-colors border border-border/50"
+                    aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >
-                    {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    {isSidebarCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
                 </button>
                 <button
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -332,7 +349,10 @@ export default function App() {
                             />
                         )}
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className={cn(
+                            "grid gap-2",
+                            isSidebarCollapsed ? "md:grid-cols-1" : "grid-cols-2"
+                        )}>
                             <button
                                 onClick={() => setIsSettingsOpen(true)}
                                 className="flex items-center justify-center h-10 rounded-xl bg-white/5 border border-white/5 text-muted hover:text-white hover:bg-white/10 transition-all"
@@ -355,7 +375,7 @@ export default function App() {
     );
 
     return (
-        <div className="flex h-screen w-screen overflow-hidden bg-[#0a0a0b] text-[#e1e2e4] font-sans selection:bg-risk-high/30">
+        <div className="flex h-screen w-full overflow-hidden bg-[#0a0a0b] text-[#e1e2e4] font-sans selection:bg-risk-high/30">
             {/* GitHub Connect Modal */}
             <AnimatePresence>
                 {showConnectModal && (
@@ -403,54 +423,59 @@ export default function App() {
             <main className="flex-1 flex flex-col min-w-0 relative">
                 <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-surface/30 backdrop-blur-md shrink-0 z-40">
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setIsMobileMenuOpen(true)}
-                            className="md:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 transition-colors"
-                        >
-                            <LayoutDashboard size={24} className="text-risk-high" />
-                        </button>
                         <div className="flex flex-col">
-                            <h2 className="text-sm font-black text-white uppercase tracking-widest hidden sm:block">
+                            <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-widest">
                                 {activeTab === 'projects' ? 'Fleet Management' : currentProject?.name || 'Selection'}
                             </h2>
                             {currentProject && activeTab !== 'projects' && (
-                                <span className="text-[10px] text-muted font-mono truncate max-w-[150px] sm:max-w-none">
+                                <span className="text-[10px] text-muted font-mono truncate max-w-[100px] sm:max-w-none hidden sm:block">
                                     {currentProject.fullName}
                                 </span>
-                            )}
-                            {!connection && !showConnectModal && (
-                                <button
-                                    onClick={() => setShowConnectModal(true)}
-                                    className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-black font-black text-[10px] uppercase tracking-tighter"
-                                >
-                                    <Github size={12} />
-                                    Connect
-                                </button>
                             )}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {selectedProject && activeTab !== 'projects' && (
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsExportOpen(!isExportOpen)}
-                                    className={cn(
-                                        "text-[10px] font-black px-4 py-2 rounded-lg transition-all tracking-widest uppercase border",
-                                        isExportOpen ? "bg-white text-black border-white" : "bg-white/5 text-white border-white/10 hover:bg-white/10"
-                                    )}
-                                >
-                                    Export Analysis
-                                </button>
-                                <ExportDropdown isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} />
-                            </div>
+                        {!connection && (
+                            <button
+                                onClick={() => setShowConnectModal(true)}
+                                className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-black font-black text-[10px] uppercase tracking-tighter shadow-[0_0_15px_rgba(255,255,255,0.2)] active:scale-95 transition-transform"
+                            >
+                                <Github size={12} />
+                                Connect
+                            </button>
                         )}
-                        <button
-                            onClick={() => setIsSettingsOpen(true)}
-                            className="p-2 rounded-lg hover:bg-white/5 transition-colors text-muted hover:text-white"
-                        >
-                            <Settings size={20} />
-                        </button>
+                        {connection && (
+                            <>
+                                {selectedProject && (
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setIsExportOpen(!isExportOpen)}
+                                            className={cn(
+                                                "text-[9px] md:text-[10px] font-black px-2 md:px-4 py-1.5 md:py-2 rounded-lg transition-all tracking-widest uppercase border flex items-center gap-1 md:gap-2",
+                                                isExportOpen ? "bg-white text-black border-white" : "bg-white/5 text-white border-white/10 hover:bg-white/10"
+                                            )}
+                                        >
+                                            <Download size={12} className="md:w-[14px] md:h-[14px]" />
+                                            <span className="hidden sm:inline">Export</span>
+                                        </button>
+                                        <ExportDropdown
+                                            isOpen={isExportOpen}
+                                            onClose={() => setIsExportOpen(false)}
+                                            activeTab={activeTab}
+                                            projectId={selectedProject || ''}
+                                        />
+                                    </div>
+                                )}
+                                <button
+                                    onClick={handleLogout}
+                                    className="md:hidden flex items-center gap-1 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted hover:text-red-400"
+                                    title="Logout"
+                                >
+                                    <LogOut size={16} />
+                                </button>
+                            </>
+                        )}
                         <SettingsPanel isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
                     </div>
                 </header>
@@ -468,7 +493,7 @@ export default function App() {
                                 transition={{ duration: 0.2 }}
                                 className={cn(
                                     "max-w-[1400px] mx-auto w-full",
-                                    (connection || activeTab !== 'projects') ? "space-y-8 md:space-y-12 pb-20" : "h-full flex items-center justify-center text-center"
+                                    (connection || activeTab !== 'projects') ? "space-y-8 md:space-y-12 pb-20" : "min-h-full flex items-center justify-center text-center py-6 md:py-0"
                                 )}
                             >
                                 <ErrorBoundary key={`eb-${activeTab}-${projectVersion}`}>
@@ -516,13 +541,32 @@ export default function App() {
                             </div>
                         )}
                     </AnimatePresence>
+
+                    {/* Copyright Footer */}
+                    <footer className="text-center py-3 mt-4 border-t border-white/5">
+                        <a
+                            href="https://github.com/yusufcalisir/RiskSurface"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-muted hover:text-white transition-colors uppercase tracking-widest"
+                        >
+                            © 2025 RiskSurface — Made by Yusuf Çalışır
+                        </a>
+                    </footer>
                 </div>
 
                 {/* Mobile Tab Bar - Horizontally Scrollable */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface/80 backdrop-blur-xl border-t border-white/5 z-50 flex items-center px-4 overflow-hidden">
+                <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface/80 backdrop-blur-xl border-t border-white/5 z-50 flex items-center overflow-hidden">
                     <div
                         id="mobile-nav-scroll"
-                        className="flex-1 flex items-center gap-6 overflow-x-auto no-scrollbar scroll-smooth pr-12"
+                        onScroll={(e) => {
+                            const target = e.currentTarget;
+                            const atEnd = target.scrollLeft + target.clientWidth >= target.scrollWidth - 10;
+                            if (atEnd !== isMobileNavAtEnd) {
+                                setIsMobileNavAtEnd(atEnd);
+                            }
+                        }}
+                        className="flex-1 flex items-center gap-8 overflow-x-auto no-scrollbar scroll-smooth px-6"
                     >
                         {navItems.map((item) => {
                             const isActive = activeTab === item.id;
@@ -545,25 +589,31 @@ export default function App() {
                             );
                         })}
                     </div>
-                    {/* Shadow/Arrow indicator */}
-                    <div className="absolute right-0 inset-y-0 w-16 bg-gradient-to-l from-surface to-transparent pointer-events-none flex items-center justify-end px-4">
-                        <motion.div
-                            animate={{ x: [0, 5, 0] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            className="bg-white/10 p-1.5 rounded-full"
+
+                    {/* Dedicated scroll arrow area */}
+                    <div className="h-full px-2 border-l border-white/5 flex items-center bg-surface/40 backdrop-blur-sm shrink-0">
+                        <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => {
+                                const container = document.getElementById('mobile-nav-scroll');
+                                if (container) {
+                                    if (isMobileNavAtEnd) {
+                                        container.scrollTo({ left: 0, behavior: 'smooth' });
+                                    } else {
+                                        container.scrollBy({ left: 200, behavior: 'smooth' });
+                                    }
+                                }
+                            }}
+                            className="p-3 bg-risk-high/10 border border-risk-high/20 rounded-xl active:opacity-60 transition-all"
                         >
-                            <ChevronRight size={14} className="text-white/40" />
-                        </motion.div>
+                            <motion.div
+                                animate={{ rotate: isMobileNavAtEnd ? 180 : 0 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                            >
+                                <ChevronRight size={18} className="text-risk-high" />
+                            </motion.div>
+                        </motion.button>
                     </div>
-                    {/* Clickable arrow to scroll */}
-                    <button
-                        onClick={() => {
-                            document.getElementById('mobile-nav-scroll')?.scrollBy({ left: 150, behavior: 'smooth' });
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center z-10"
-                    >
-                        {/* Empty button overlaying the indicator for touch */}
-                    </button>
                 </div>
             </main>
         </div>

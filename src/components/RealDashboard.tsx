@@ -160,8 +160,11 @@ export default function RealDashboard({ projectId }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+    const [refreshError, setRefreshError] = useState('');
 
-    const fetchAnalysis = async () => {
+    const fetchAnalysis = async (retryCount = 0) => {
+        const MAX_RETRIES = 3;
+
         // Reset state on each fetch to prevent stale data
         setRepo(null);
         setError('');
@@ -184,10 +187,15 @@ export default function RealDashboard({ projectId }: Props) {
             // CRITICAL: Validate response matches expected projectId
             const returnedFullName = data.project?.fullName;
             if (returnedFullName !== projectId) {
-                console.warn(`[RealDashboard] Project mismatch: expected ${projectId}, got ${returnedFullName}. Retrying in 500ms...`);
-                // Backend might be out of sync - retry after short delay
-                setTimeout(() => fetchAnalysis(), 500);
-                return;
+                console.warn(`[RealDashboard] Project mismatch: expected ${projectId}, got ${returnedFullName}. Retry ${retryCount + 1}/${MAX_RETRIES}`);
+                if (retryCount < MAX_RETRIES) {
+                    setTimeout(() => fetchAnalysis(retryCount + 1), 500);
+                    return;
+                } else {
+                    setError(`Project sync issue. Please re-select the project.`);
+                    setLoading(false);
+                    return;
+                }
             }
 
             // Check if analysis data exists
@@ -229,16 +237,48 @@ export default function RealDashboard({ projectId }: Props) {
 
     const handleRefresh = async () => {
         setRefreshing(true);
+        setRefreshError('');
         try {
             const res = await fetch(`${API_BASE}/api/analysis/refresh`, { method: 'POST' });
             if (res.ok) {
-                // Backend finished re-analysis, now pull the fresh mapped data
-                await fetchAnalysis();
+                const data = await res.json();
+                // Use the response body directly instead of making another call
+                if (data.analysis && data.project) {
+                    setRepo({
+                        id: data.project.id?.toString() || '',
+                        url: `https://github.com/${data.project.fullName}`,
+                        name: data.project.name || projectId.split('/')[1],
+                        owner: data.project.owner || projectId.split('/')[0],
+                        status: 'ready',
+                        connectedAt: new Date().toISOString(),
+                        fullName: data.project.fullName,
+                        metadata: {
+                            fullName: data.project.fullName,
+                            description: data.project.description || '',
+                            defaultBranch: data.project.defaultBranch || 'main',
+                            stars: data.project.stars || 0,
+                            forks: data.project.forks || 0,
+                            openIssues: 0,
+                            language: data.project.language || '',
+                            private: data.project.private || false,
+                            createdAt: new Date().toISOString(),
+                            pushedAt: new Date().toISOString()
+                        },
+                        analysis: data.analysis
+                    });
+                } else {
+                    // Fallback to fetchAnalysis if response is incomplete
+                    await fetchAnalysis();
+                }
+            } else {
+                setRefreshError('Refresh failed. Server returned an error.');
             }
         } catch (err) {
             console.error(err);
+            setRefreshError('Refresh failed. Network error.');
+        } finally {
+            setRefreshing(false);
         }
-        setRefreshing(false);
     };
 
     useEffect(() => {

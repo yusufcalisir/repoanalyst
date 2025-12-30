@@ -5,6 +5,8 @@ import { FileText, FileSpreadsheet, Code, Check, Loader2, Download } from 'lucid
 interface ExportDropdownProps {
     isOpen: boolean;
     onClose: () => void;
+    activeTab?: string;
+    projectId?: string;
 }
 
 type ExportFormat = 'pdf' | 'csv' | 'json';
@@ -12,7 +14,7 @@ type ExportState = 'idle' | 'exporting' | 'complete';
 
 import { API_BASE } from '../config';
 
-export default function ExportDropdown({ isOpen, onClose }: ExportDropdownProps) {
+export default function ExportDropdown({ isOpen, onClose, activeTab = 'analysis', projectId = '' }: ExportDropdownProps) {
     const [format, setFormat] = useState<ExportFormat>('pdf');
     const [exportState, setExportState] = useState<ExportState>('idle');
 
@@ -20,7 +22,12 @@ export default function ExportDropdown({ isOpen, onClose }: ExportDropdownProps)
         setExportState('exporting');
 
         try {
-            const response = await fetch(`${API_BASE}/api/export/${format}`);
+            // Include activeTab and projectId in the API call
+            const params = new URLSearchParams();
+            if (activeTab) params.append('tab', activeTab);
+            if (projectId) params.append('project', projectId);
+
+            const response = await fetch(`${API_BASE}/api/export/${format}?${params.toString()}`);
 
             if (!response.ok) throw new Error('Export failed');
 
@@ -35,7 +42,10 @@ export default function ExportDropdown({ isOpen, onClose }: ExportDropdownProps)
                 json: 'json'
             };
 
-            a.download = `risksurface-report-${Date.now()}.${extensions[format]}`;
+            // Generate descriptive filename with project and tab info
+            const projectName = projectId ? projectId.replace('/', '-') : 'risksurface';
+            const tabName = activeTab || 'report';
+            a.download = `${projectName}_${tabName}_${Date.now()}.${extensions[format]}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

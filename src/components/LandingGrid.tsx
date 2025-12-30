@@ -22,7 +22,7 @@ const tiles = [
 
 export default function LandingGrid({ onConnect }: LandingGridProps) {
     return (
-        <div className="w-full h-full flex items-center justify-center py-8 relative">
+        <div className="w-full min-h-full flex items-center justify-center py-4 md:py-8 relative">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.02),transparent)] pointer-events-none" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-[1600px] relative z-10">
                 {tiles.map((tile, index) => (
@@ -78,31 +78,7 @@ export default function LandingGrid({ onConnect }: LandingGridProps) {
                         </div>
 
                         <div className="relative z-10">
-                            {tile.id === 'projects' ? (
-                                <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
-                                        <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Awaiting Data Feed</span>
-                                    </div>
-                                    <div className="text-[8px] font-mono text-white/10 font-black uppercase">
-                                        STATUS: IDLE
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Module Inactive</span>
-                                        <div className="flex gap-1.5">
-                                            {[...Array(3)].map((_, i) => (
-                                                <div key={i} className="w-8 h-1 bg-white/[0.03] rounded-full" />
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="text-[8px] font-mono text-white/5 font-black uppercase">
-                                        ERR: NO_SRC
-                                    </div>
-                                </div>
-                            )}
+                            <div className="pt-4 border-t border-white/5" />
                         </div>
                     </motion.div>
                 ))}
