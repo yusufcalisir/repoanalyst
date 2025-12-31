@@ -20,6 +20,7 @@ interface ProjectsGridProps {
     selectedProject: string | null;
     analyzingProject: string | null;
     isConnected: boolean;
+    isLoading?: boolean;
     onSelectProject: (fullName: string) => void;
     onConnect: () => void;
 }
@@ -48,12 +49,23 @@ export default function ProjectsGrid({
     selectedProject,
     analyzingProject,
     isConnected,
+    isLoading = false,
     onSelectProject,
     onConnect
 }: ProjectsGridProps) {
     // Not connected state - show connect prompt
     if (!isConnected) {
         return <LandingGrid onConnect={onConnect} />;
+    }
+
+    // Loading state - don't show empty message yet
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-96 gap-4">
+                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Loading repositories...</p>
+            </div>
+        );
     }
 
     // No repos found

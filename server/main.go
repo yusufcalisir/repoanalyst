@@ -263,6 +263,41 @@ func setCachedSection(cacheKey string, data interface{}, projectKey, inputHash s
 	log.Printf("[Cache] Stored section cache for %s", cacheKey)
 }
 
+// ==================== RAW GITHUB DATA CACHE (FETCH/COMPUTE SEPARATION) ====================
+
+type RawGitHubDataCache struct {
+	Commits      []GitHubCommit      `json:"commits"`
+	Tree         []GitHubTreeNode    `json:"tree"`
+	Contributors []GitHubContributor `json:"contributors"`
+	Dependencies []string            `json:"dependencies"`
+	FetchedAt    time.Time           `json:"fetchedAt"`
+	FetchTimeMs  int64               `json:"fetchTimeMs"`
+}
+
+var rawDataCache = make(map[string]*RawGitHubDataCache)
+var rawDataMutex sync.RWMutex
+
+// getRawData returns cached raw GitHub data if fresh
+func getRawData(projectKey string) (*RawGitHubDataCache, bool) {
+	rawDataMutex.RLock()
+	defer rawDataMutex.RUnlock()
+
+	data, exists := rawDataCache[projectKey]
+	if !exists || time.Since(data.FetchedAt) > REPO_CACHE_TTL {
+		return nil, false
+	}
+	return data, true
+}
+
+// setRawData stores raw GitHub data in cache
+func setRawData(projectKey string, data *RawGitHubDataCache) {
+	rawDataMutex.Lock()
+	defer rawDataMutex.Unlock()
+	data.FetchedAt = time.Now()
+	rawDataCache[projectKey] = data
+	log.Printf("[RawCache] Stored raw data for %s (fetch: %dms)", projectKey, data.FetchTimeMs)
+}
+
 // ==================== REPOSITORY ANALYSIS CACHE ====================
 
 type RepositoryAnalysisCache struct {
@@ -280,6 +315,90 @@ type RepositoryAnalysisCache struct {
 	Dependencies    *DependencyAnalysis    `json:"dependencies"`
 	Concentration   *ConcentrationAnalysis `json:"concentration"`
 	IsComputing     bool                   `json:"isComputing"`
+}
+
+// ==================== SINGLE ANALYSIS LIFECYCLE ====================
+
+// RepositoryAnalysisState holds ALL precomputed analysis for a repository
+// This is the SINGLE SOURCE OF TRUTH - no computation in request handlers
+type RepositoryAnalysisState struct {
+	ProjectKey     string    `json:"projectKey"`
+	AnalyzedAt     time.Time `json:"analyzedAt"`
+	AnalysisTimeMs int64     `json:"analysisTimeMs"`
+	Status         string    `json:"status"` // pending, analyzing, ready, failed
+
+	// Raw data (fetched ONCE from GitHub)
+	RawCommits      []GitHubCommit      `json:"-"` // Not serialized, large
+	RawTree         []GitHubTreeNode    `json:"-"`
+	RawContributors []GitHubContributor `json:"-"`
+	FetchTimeMs     int64               `json:"fetchTimeMs"`
+
+	// Precomputed section data (computed ONCE after fetch)
+	Topology      interface{} `json:"topology"`
+	Trajectory    interface{} `json:"trajectory"`
+	Impact        interface{} `json:"impact"`
+	Dependencies  interface{} `json:"dependencies"`
+	Concentration interface{} `json:"concentration"`
+	Temporal      interface{} `json:"temporal"`
+	Predictions   interface{} `json:"predictions"`
+
+	// Section timing (for performance verification)
+	SectionTimings map[string]int64 `json:"sectionTimings"`
+}
+
+var analysisStates = make(map[string]*RepositoryAnalysisState)
+var analysisStatesMutex sync.RWMutex
+var analysisInProgress = make(map[string]bool) // Deduplication guard
+var analysisInProgressMutex sync.Mutex
+
+// getAnalysisState returns precomputed state (READ-ONLY, no computation)
+func getAnalysisState(projectKey string) (*RepositoryAnalysisState, bool) {
+	analysisStatesMutex.RLock()
+	defer analysisStatesMutex.RUnlock()
+
+	state, exists := analysisStates[projectKey]
+	if !exists || state.Status != "ready" {
+		return state, false
+	}
+	return state, true
+}
+
+// isAnalysisInProgress checks deduplication guard
+func isAnalysisInProgress(projectKey string) bool {
+	analysisInProgressMutex.Lock()
+	defer analysisInProgressMutex.Unlock()
+	return analysisInProgress[projectKey]
+}
+
+// markAnalysisStarted sets deduplication guard
+func markAnalysisStarted(projectKey string) bool {
+	analysisInProgressMutex.Lock()
+	defer analysisInProgressMutex.Unlock()
+
+	if analysisInProgress[projectKey] {
+		return false // Already in progress, don't start again
+	}
+	analysisInProgress[projectKey] = true
+	return true
+}
+
+// markAnalysisComplete clears deduplication guard
+func markAnalysisComplete(projectKey string) {
+	analysisInProgressMutex.Lock()
+	defer analysisInProgressMutex.Unlock()
+	delete(analysisInProgress, projectKey)
+}
+
+// setAnalysisState stores completed analysis
+func setAnalysisState(projectKey string, state *RepositoryAnalysisState) {
+	analysisStatesMutex.Lock()
+	defer analysisStatesMutex.Unlock()
+
+	state.AnalyzedAt = time.Now()
+	state.Status = "ready"
+	analysisStates[projectKey] = state
+	log.Printf("[AnalysisState] Stored complete analysis for %s (fetch: %dms, analysis: %dms)",
+		projectKey, state.FetchTimeMs, state.AnalysisTimeMs)
 }
 
 // Current metric version - bump when computation logic changes

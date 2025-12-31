@@ -600,6 +600,7 @@ export default function App() {
                                             selectedProject={selectedProject}
                                             analyzingProject={analyzingProject}
                                             isConnected={!!connection}
+                                            isLoading={isCheckingConnection}
                                             onSelectProject={handleSelectProject}
                                             onConnect={() => setShowConnectModal(true)}
                                         />
