@@ -115,7 +115,7 @@ export default function RealTrajectory({ projectId, onLoadingChange }: Props) {
         : '';
 
     return (
-        <div className="space-y-6 max-w-[1400px] mx-auto animate-in fade-in duration-700">
+        <div className="space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-700 w-full px-4 md:px-6">
             <ProjectContextHeader title="Risk Trajectory" projectId={projectId} />
 
             {/* Velocity Controls (Integrated into Header Row) */}
@@ -254,7 +254,7 @@ export default function RealTrajectory({ projectId, onLoadingChange }: Props) {
             </div>
 
             {/* Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                 <MetricCard
                     title="Computed Velocity"
                     value={`${trajectory.velocityFactor.toFixed(1)}x`}
@@ -301,7 +301,7 @@ function MetricCard({ title, value, trend, description, icon: Icon }: { title: s
     const isDown = trend === 'decelerating' || trend === 'down' || trend === 'increasing_risk';
 
     return (
-        <div className="glass-panel rounded-3xl p-6 border border-white/10 hover:border-white/20 transition-all">
+        <div className="glass-panel rounded-3xl p-4 md:p-6 border border-white/10 hover:border-white/20 transition-all">
             <div className="flex items-center justify-between mb-4">
                 <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
                     <Icon size={18} className="text-purple-400" />

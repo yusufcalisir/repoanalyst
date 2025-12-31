@@ -356,8 +356,8 @@ export default function RealDashboard({ projectId, onLoadingChange, onTabChange 
     const { metadata, analysis } = repo;
 
     return (
-        <div className="space-y-8">
-            <ProjectContextHeader title="Systemic Risk Dashboard" projectId={projectId} />
+        <div className="space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-700 w-full px-4 md:px-6">
+            <ProjectContextHeader title="Analysis" projectId={projectId} />
 
             {/* Repository Info Summary (Compact) */}
             <div className="glass-panel rounded-2xl p-4 md:p-6 border border-white/5">
@@ -411,7 +411,7 @@ export default function RealDashboard({ projectId, onLoadingChange, onTabChange 
 
 
             {/* Computed Scores - Deterministic from Real Data */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <ScoreCard
                     label="Activity Score"
                     value={analysis?.activityScore?.toFixed(1) || '0'}
@@ -456,47 +456,76 @@ export default function RealDashboard({ projectId, onLoadingChange, onTabChange 
                     </span>
                 </h3>
 
-                {analysis?.commitActivity ? (
-                    <ActivityHeatMap
-                        activity={analysis.commitActivity}
-                        totalCommits={analysis.totalCommits || 0}
-                    />
-                ) : (
-                    <div className="h-24 flex items-center justify-center bg-white/5 rounded-xl border border-dotted border-white/10 italic text-muted text-sm">
-                        Activity analysis pending...
-                    </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-6 pt-6 border-t border-white/5 gap-4">
-                    <div className="flex items-center gap-6">
-                        <div>
-                            <div className="text-[9px] uppercase font-black text-white/30 tracking-widest leading-none mb-1">Volatility Index</div>
-                            <div className={`text-sm font-black italic ${analysis.volatility?.classification === 'Low' ? 'text-green-400' :
-                                analysis.volatility?.classification === 'Moderate' ? 'text-yellow-400' : 'text-risk-high'
-                                }`}>
-                                {analysis.volatility?.volatilityScore.toFixed(2)} {analysis.volatility?.classification}
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr,320px] gap-8">
+                    <div className="min-w-0 h-full flex flex-col justify-center">
+                        {analysis?.commitActivity ? (
+                            <ActivityHeatMap
+                                activity={analysis.commitActivity}
+                                totalCommits={analysis.totalCommits || 0}
+                                hideFooter={true}
+                            />
+                        ) : (
+                            <div className="h-24 flex items-center justify-center bg-white/5 rounded-xl border border-dotted border-white/10 italic text-muted text-sm">
+                                Activity analysis pending...
                             </div>
-                        </div>
-                        <div>
-                            <div className="text-[9px] uppercase font-black text-white/30 tracking-widest leading-none mb-1">Daily Baseline</div>
-                            <div className="text-sm font-bold text-white lowercase normal-case tracking-normal italic font-sans leading-none">
-                                {analysis.volatility?.baselineActivity.toFixed(1)} <span className="text-[9px] text-white/40 font-medium">commits/day</span>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
-                    {analysis.volatility?.burstPeriods && analysis.volatility.burstPeriods.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-risk-high/10 border border-risk-high/20">
-                            <Activity size={12} className="text-risk-high animate-pulse" />
-                            <span className="text-[9px] font-black text-risk-high uppercase tracking-tight">
-                                {analysis.volatility.burstPeriods.length} Bursts
-                            </span>
-                        </div>
-                    )}
-                </div>
+                    <div className="flex flex-col justify-between py-1 border-l border-white/5 pl-8">
+                        <div className="space-y-8">
+                            {/* Intensity Guide - Now at top */}
+                            <div className="space-y-3">
+                                <div className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em]">Intensity Guide</div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex gap-[3px]">
+                                        {[0, 20, 40, 70, 100].map((opacity, level) => {
+                                            const colors = ['bg-white/5', 'bg-green-500/20', 'bg-green-500/40', 'bg-green-500/70', 'bg-green-500'];
+                                            return (
+                                                <div
+                                                    key={level}
+                                                    className={`w-3.5 h-3.5 rounded-[2px] ${colors[level]} border border-white/5`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    <span className="text-[9px] text-white/30 lowercase italic">less → more</span>
+                                </div>
+                            </div>
 
-                <div className="mt-4 text-[9px] text-white/40 italic font-medium font-sans text-center px-4">
-                    {analysis.volatility?.interpretation}
+                            <div className="space-y-6">
+                                {/* Volatility Index & Daily Baseline - Now below */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="text-[9px] uppercase font-black text-white/30 tracking-widest leading-none mb-1">Volatility Index</div>
+                                        <div className={`text-base font-black italic ${analysis.volatility?.classification === 'Low' ? 'text-green-400' :
+                                            analysis.volatility?.classification === 'Moderate' ? 'text-yellow-400' : 'text-risk-high'
+                                            }`}>
+                                            {analysis.volatility?.volatilityScore.toFixed(2)} {analysis.volatility?.classification}
+                                        </div>
+                                    </div>
+                                    {analysis.volatility?.burstPeriods && analysis.volatility.burstPeriods.length > 0 && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-risk-high/10 border border-risk-high/20">
+                                            <Activity size={12} className="text-risk-high animate-pulse" />
+                                            <span className="text-[9px] font-black text-risk-high uppercase tracking-tight">
+                                                {analysis.volatility.burstPeriods.length} Bursts
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <div className="text-[9px] uppercase font-black text-white/30 tracking-widest leading-none mb-1">Daily Baseline</div>
+                                    <div className="text-sm font-bold text-white lowercase normal-case tracking-normal italic font-sans leading-none">
+                                        {analysis.volatility?.baselineActivity.toFixed(1)} <span className="text-[9px] text-white/40 font-medium">commits/day</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 text-[9px] text-white/40 italic font-medium font-sans leading-relaxed border-t border-white/5 pt-4">
+                            {analysis.volatility?.interpretation}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -573,17 +602,17 @@ export default function RealDashboard({ projectId, onLoadingChange, onTabChange 
             }
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
                 {/* Top Directories - Real File Structure */}
-                <div className="glass-panel rounded-2xl p-6 h-full">
-                    <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2">
+                <div className="glass-panel rounded-2xl p-6 h-full flex flex-col">
+                    <h3 className="font-bold text-lg text-white mb-6 flex items-center gap-2">
                         <FolderTree size={18} />
                         Repository Structure
                         <span className="text-xs font-normal text-muted">(from Git tree API)</span>
                     </h3>
                     {analysis?.topDirectories && analysis.topDirectories.length > 0 ? (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
+                        <div className="flex-1 flex flex-col justify-between space-y-8">
+                            <div className="space-y-3">
                                 {analysis.topDirectories.map((dir, i) => {
                                     const maxFiles = analysis.topDirectories[0]?.fileCount || 1;
                                     const width = (dir.fileCount / maxFiles) * 100;
@@ -604,179 +633,183 @@ export default function RealDashboard({ projectId, onLoadingChange, onTabChange 
                                 })}
                             </div>
 
-                            {/* Structural Depth Analysis Signal */}
-                            {analysis.structuralDepth && analysis.structuralDepth.available && (
-                                <div className="pt-4 border-t border-white/5 space-y-4">
-                                    <div className="flex items-end justify-between">
-                                        <div>
-                                            <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Structural Depth</div>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-xl font-black text-white">{analysis.structuralDepth.maxDepth}</span>
-                                                <span className="text-[10px] text-white/40 font-bold uppercase">Max Layers</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Stability Status</div>
-                                            <div className="text-xs font-bold text-blue-400 capitalize">{analysis.structuralDepth.structureStatus}</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Depth Distribution Sparkline */}
-                                    <div className="space-y-1.5">
-                                        <div className="flex justify-between items-center text-[9px] text-white/20 uppercase font-black px-1">
-                                            <span>Root</span>
-                                            <span>Deepest</span>
-                                        </div>
-                                        <div className="flex items-end gap-1 h-8 px-1">
-                                            {Object.entries(analysis.structuralDepth.filesPerDepth).map(([depth, count]) => {
-                                                const maxInDepth = Math.max(...Object.values(analysis.structuralDepth?.filesPerDepth || {}));
-                                                const height = (count / maxInDepth) * 100;
-                                                return (
-                                                    <div
-                                                        key={depth}
-                                                        className="flex-1 bg-white/10 rounded-t-sm hover:bg-blue-400/40 transition-colors group relative"
-                                                        style={{ height: `${height}%` }}
-                                                    >
-                                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-black text-[9px] px-1.5 py-0.5 rounded border border-white/10 whitespace-nowrap z-30">
-                                                            Depth {depth}: {count} files
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Imbalances */}
-                                    {analysis.structuralDepth.imbalances.length > 0 && (
-                                        <div className="flex flex-wrap gap-2">
-                                            {analysis.structuralDepth.imbalances.map(imbalance => (
-                                                <div key={imbalance} className="px-2 py-0.5 rounded bg-risk-high/10 border border-risk-high/20 text-[9px] font-black text-risk-high uppercase tracking-tight">
-                                                    {imbalance}
+                            <div className="flex-1 flex flex-col justify-end space-y-8">
+                                {/* Structural Depth Analysis Signal */}
+                                {analysis.structuralDepth && analysis.structuralDepth.available && (
+                                    <div className="pt-4 border-t border-white/5 space-y-4">
+                                        <div className="flex items-end justify-between">
+                                            <div>
+                                                <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Structural Depth</div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-xl font-black text-white">{analysis.structuralDepth.maxDepth}</span>
+                                                    <span className="text-[10px] text-white/40 font-bold uppercase">Max Layers</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Test Surface Analysis Signal */}
-                            {analysis.testSurface && analysis.testSurface.available && (
-                                <div className="pt-4 border-t border-white/5 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Test Surface Ratio</div>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-xl font-black text-white">{analysis.testSurface.testFileCount}</span>
-                                                <span className="text-[10px] text-white/40 font-bold uppercase">Test Files ({analysis.testSurface.surfaceRatio.toFixed(1)}%)</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Stability Status</div>
+                                                <div className="text-xs font-bold text-blue-400 capitalize">{analysis.structuralDepth.structureStatus}</div>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Distribution</div>
-                                            <div className="text-xs font-bold text-green-400 capitalize">{analysis.testSurface.distribution}</div>
-                                        </div>
-                                    </div>
 
-                                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden flex">
-                                        <div
-                                            className="h-full bg-blue-500/80"
-                                            style={{ width: `${100 - analysis.testSurface.testPercentage}%` }}
-                                        />
-                                        <div
-                                            className="h-full bg-green-500"
-                                            style={{ width: `${analysis.testSurface.testPercentage}%` }}
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-[10px]">
-                                        <div className="flex items-center gap-1.5 p-1 rounded hover:bg-white/5 transition-colors group relative">
-                                            <div className="w-2 h-2 rounded-full bg-blue-500/80" />
-                                            <span className="text-white/40 font-bold uppercase">Prod: {analysis.testSurface.productionFileCount}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 p-1 rounded hover:bg-white/5 transition-colors group relative">
-                                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                                            <span className="text-white/40 font-bold uppercase">Test: {analysis.testSurface.testFileCount}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Warnings & Dependencies */}
-                                    <div className="space-y-2">
-                                        <div className="text-[10px] text-white/30 italic">
-                                            {analysis.testSurface.interpretation}
-                                        </div>
-                                        {analysis.testSurface.mismatchedDeps && (
-                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-black text-yellow-500 uppercase tracking-tight">
-                                                <AlertCircle size={12} />
-                                                Test dependencies found but no local test surface detected
+                                        {/* Depth Distribution Sparkline */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center text-[9px] text-white/20 uppercase font-black px-1">
+                                                <span>Root</span>
+                                                <span>Deepest</span>
                                             </div>
-                                        )}
-                                        {analysis.testSurface.testDependenciesFound.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5 opacity-50">
-                                                {analysis.testSurface.testDependenciesFound.slice(0, 3).map(dep => (
-                                                    <span key={dep} className="text-[8px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/40 font-mono">
-                                                        {dep}
-                                                    </span>
+                                            <div className="flex items-end gap-1 h-8 px-1">
+                                                {Object.entries(analysis.structuralDepth.filesPerDepth).map(([depth, count]) => {
+                                                    const maxInDepth = Math.max(...Object.values(analysis.structuralDepth?.filesPerDepth || {}));
+                                                    const height = (count / maxInDepth) * 100;
+                                                    return (
+                                                        <div
+                                                            key={depth}
+                                                            className="flex-1 bg-white/10 rounded-t-sm hover:bg-blue-400/40 transition-colors group relative"
+                                                            style={{ height: `${height}%` }}
+                                                        >
+                                                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-black text-[9px] px-1.5 py-0.5 rounded border border-white/10 whitespace-nowrap z-30">
+                                                                Depth {depth}: {count} files
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Imbalances */}
+                                        {analysis.structuralDepth.imbalances.length > 0 && (
+                                            <div className="flex flex-wrap gap-2">
+                                                {analysis.structuralDepth.imbalances.map(imbalance => (
+                                                    <div key={imbalance} className="px-2 py-0.5 rounded bg-risk-high/10 border border-risk-high/20 text-[9px] font-black text-risk-high uppercase tracking-tight">
+                                                        {imbalance}
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Privacy & Security Signal Consistency Signal */}
-                            {analysis.securityAnalysis && analysis.securityAnalysis.available && (
-                                <div className="pt-4 border-t border-white/5 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Security Corroboration</div>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-xl font-black text-white">{analysis.securityAnalysis.overallStatus}</span>
-                                                <span className="text-[10px] text-white/40 font-bold uppercase">Consistency</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Claims Verified</div>
-                                            <div className="text-xs font-bold text-blue-400">
-                                                {analysis.securityAnalysis.claims.filter(c => c.classification !== 'Uncorroborated').length}/{analysis.securityAnalysis.claims.length}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        {analysis.securityAnalysis.claims.map(claim => (
-                                            <div key={claim.claim} className="p-2 rounded bg-white/5 border border-white/10 space-y-1.5 hover:bg-white/10 transition-colors">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-[10px] font-bold text-white uppercase">{claim.claim}</span>
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${claim.classification === 'Supported' ? 'text-green-400 bg-green-400/10' :
-                                                        claim.classification === 'Weakly Supported' ? 'text-yellow-400 bg-yellow-400/10' :
-                                                            'text-risk-high bg-risk-high/10'
-                                                        }`}>
-                                                        {claim.classification}
-                                                    </span>
+                                {/* Test Surface Analysis Signal */}
+                                {analysis.testSurface && analysis.testSurface.available && (
+                                    <div className="pt-4 border-t border-white/5 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Test Surface Ratio</div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-xl font-black text-white">{analysis.testSurface.testFileCount}</span>
+                                                    <span className="text-[10px] text-white/40 font-bold uppercase">Test Files ({analysis.testSurface.surfaceRatio.toFixed(1)}%)</span>
                                                 </div>
-                                                {claim.supportingSignals.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {claim.supportingSignals.slice(0, 3).map(sig => (
-                                                            <span key={sig} className="text-[8px] text-white/40 font-mono truncate max-w-[100px]">
-                                                                {sig.split('/').pop()}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
                                             </div>
-                                        ))}
+                                            <div className="text-right">
+                                                <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Distribution</div>
+                                                <div className="text-xs font-bold text-green-400 capitalize">{analysis.testSurface.distribution}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden flex">
+                                            <div
+                                                className="h-full bg-blue-500/80"
+                                                style={{ width: `${100 - analysis.testSurface.testPercentage}%` }}
+                                            />
+                                            <div
+                                                className="h-full bg-green-500"
+                                                style={{ width: `${analysis.testSurface.testPercentage}%` }}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <div className="flex items-center gap-1.5 p-1 rounded hover:bg-white/5 transition-colors group relative">
+                                                <div className="w-2 h-2 rounded-full bg-blue-500/80" />
+                                                <span className="text-white/40 font-bold uppercase">Prod: {analysis.testSurface.productionFileCount}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 p-1 rounded hover:bg-white/5 transition-colors group relative">
+                                                <div className="w-2 h-2 rounded-full bg-green-500" />
+                                                <span className="text-white/40 font-bold uppercase">Test: {analysis.testSurface.testFileCount}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Warnings & Dependencies */}
+                                        <div className="space-y-2">
+                                            <div className="text-[10px] text-white/30 italic">
+                                                {analysis.testSurface.interpretation}
+                                            </div>
+                                            {analysis.testSurface.mismatchedDeps && (
+                                                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-black text-yellow-500 uppercase tracking-tight">
+                                                    <AlertCircle size={12} />
+                                                    Test dependencies found but no local test surface detected
+                                                </div>
+                                            )}
+                                            {analysis.testSurface.testDependenciesFound.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 opacity-50">
+                                                    {analysis.testSurface.testDependenciesFound.slice(0, 3).map(dep => (
+                                                        <span key={dep} className="text-[8px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/40 font-mono">
+                                                            {dep}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="text-[10px] text-white/30 italic leading-tight">
-                                        "{analysis.securityAnalysis.interpretation}"
+                                )}
+
+                                {/* Privacy & Security Signal Consistency Signal */}
+                                {analysis.securityAnalysis && analysis.securityAnalysis.available && (
+                                    <div className="pt-4 border-t border-white/5 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Security Corroboration</div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-xl font-black text-white">{analysis.securityAnalysis.overallStatus}</span>
+                                                    <span className="text-[10px] text-white/40 font-bold uppercase">Consistency</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Claims Verified</div>
+                                                <div className="text-xs font-bold text-blue-400">
+                                                    {analysis.securityAnalysis.claims.filter(c => c.classification !== 'Uncorroborated').length}/{analysis.securityAnalysis.claims.length}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {analysis.securityAnalysis.claims.map(claim => (
+                                                <div key={claim.claim} className="p-2 rounded bg-white/5 border border-white/10 space-y-1.5 hover:bg-white/10 transition-colors">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] font-bold text-white uppercase">{claim.claim}</span>
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${claim.classification === 'Supported' ? 'text-green-400 bg-green-400/10' :
+                                                            claim.classification === 'Weakly Supported' ? 'text-yellow-400 bg-yellow-400/10' :
+                                                                'text-risk-high bg-risk-high/10'
+                                                            }`}>
+                                                            {claim.classification}
+                                                        </span>
+                                                    </div>
+                                                    {claim.supportingSignals.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {claim.supportingSignals.slice(0, 3).map(sig => (
+                                                                <span key={sig} className="text-[8px] text-white/40 font-mono truncate max-w-[100px]">
+                                                                    {sig.split('/').pop()}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="text-[10px] text-white/30 italic leading-tight">
+                                            "{analysis.securityAnalysis.interpretation}"
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     ) : (
-                        <RepositoryTree projectId={projectId} />
+                        <div className="flex-1 overflow-hidden">
+                            <RepositoryTree projectId={projectId} />
+                        </div>
                     )}
                 </div>
 
-                <div className="flex flex-col gap-6 h-full">
+                <div className="flex flex-col gap-6 w-full">
                     <RecommendationCard onTabChange={onTabChange} />
                     {/* File Extensions - Real Data */}
                     <div className="glass-panel rounded-2xl p-6">

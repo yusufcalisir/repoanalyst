@@ -4,6 +4,10 @@
 
 @layer base {
     :root {
+        --background: 10 10 11;
+        --foreground: 225 226 228;
+        --surface: 20 20 23;
+        --border: 57 57 60;
     }
 
     html,

@@ -112,7 +112,7 @@ export default function RealImpact({ projectId, onLoadingChange }: Props) {
     };
 
     return (
-        <div className="space-y-6 max-w-[1400px] mx-auto animate-in fade-in duration-700">
+        <div className="space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-700 w-full px-4 md:px-6">
             <ProjectContextHeader title="Impact Surface" projectId={projectId} />
 
             {/* Header / Context */}
@@ -126,7 +126,7 @@ export default function RealImpact({ projectId, onLoadingChange }: Props) {
             </div>
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
                     label="Critical"
                     value={impact.criticalCount}
@@ -261,7 +261,7 @@ export default function RealImpact({ projectId, onLoadingChange }: Props) {
                                     >
                                         <div className="p-4 bg-black/20">
                                             <div className="text-[10px] uppercase font-bold text-white/30 mb-2">Files ({unit.filePaths.length})</div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 max-h-48 overflow-y-auto">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 max-h-48 overflow-y-auto items-start">
                                                 {unit.filePaths.slice(0, 15).map((path, pi) => (
                                                     <div key={pi} className="text-xs text-white/50 font-mono truncate hover:text-white transition-colors">
                                                         {path}
@@ -306,7 +306,7 @@ function StatCard({ label, value, color, icon: Icon, description }: {
     };
 
     return (
-        <div className={`rounded-2xl p-4 bg-gradient-to-br ${colors[color]} border`}>
+        <div className={`rounded-2xl p-3 md:p-4 bg-gradient-to-br ${colors[color]} border`}>
             <div className="flex items-center gap-2 mb-2">
                 <Icon size={14} />
                 <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">{label}</span>

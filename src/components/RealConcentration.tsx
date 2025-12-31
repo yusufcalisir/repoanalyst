@@ -117,7 +117,7 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
     }
 
     return (
-        <div className="space-y-6 max-w-[1400px] mx-auto animate-in fade-in duration-700">
+        <div className="space-y-6 max-w-[1600px] mx-auto animate-in fade-in duration-700 w-full px-4 md:px-6">
             <ProjectContextHeader title="Change Concentration" projectId={projectId} />
 
             {/* Header / Sub-Context */}
@@ -132,8 +132,8 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
             </div>
 
             {/* Summary Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-panel rounded-2xl p-6 border border-white/10 relative overflow-hidden group">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="glass-panel rounded-2xl p-4 md:p-6 border border-white/10 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Target size={60} />
                     </div>
@@ -144,7 +144,7 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
                     </p>
                 </div>
 
-                <div className="glass-panel rounded-2xl p-6 border border-white/10 relative overflow-hidden group">
+                <div className="glass-panel rounded-2xl p-4 md:p-6 border border-white/10 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Clock size={60} />
                     </div>
@@ -157,7 +157,7 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
                 </div>
 
                 <div className={cn(
-                    "glass-panel rounded-2xl p-6 border transition-all relative overflow-hidden group",
+                    "glass-panel rounded-2xl p-4 md:p-6 border transition-all relative overflow-hidden group",
                     data.ownershipRisk?.riskLevel === 'High' ? "border-risk-critical/30 bg-risk-critical/5 shadow-lg shadow-risk-critical/5" : "border-white/10"
                 )}>
                     <div className="flex items-center justify-between mb-4">
@@ -185,7 +185,7 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
             </div>
 
             {/* Hotspots & Ownership List */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
                 <div className="lg:col-span-2 glass-panel rounded-2xl border border-white/10 overflow-hidden">
                     <div className="p-6 border-b border-white/10 bg-white/5 flex items-center justify-between">
                         <div className="flex items-center gap-3">

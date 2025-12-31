@@ -193,7 +193,7 @@ export default function RealTopology({ projectId, onLoadingChange }: Props) {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 max-w-[1600px] mx-auto w-full px-4 md:px-6">
             <ProjectContextHeader title="System Topology" projectId={projectId} />
 
             {/* Inferred Context Description */}
@@ -210,7 +210,7 @@ export default function RealTopology({ projectId, onLoadingChange }: Props) {
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <MetricCard
                     label="Sub-Domains"
                     value={metrics.subDomainsTracked.toString()}
@@ -368,7 +368,7 @@ function MetricCard({
     };
 
     return (
-        <div className={`rounded-xl p-4 bg-gradient-to-br ${colors[color]} border min-w-0`}>
+        <div className={`rounded-xl p-3 md:p-4 bg-gradient-to-br ${colors[color]} border min-w-0`}>
             <div className="text-[10px] text-muted uppercase tracking-wider font-bold mb-2 truncate">{label}</div>
             <div className="text-xl md:text-2xl font-black text-white truncate">{value}</div>
             <div className="text-[10px] text-muted mt-1 truncate">{description}</div>

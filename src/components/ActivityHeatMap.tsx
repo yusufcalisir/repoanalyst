@@ -11,9 +11,10 @@ interface CommitActivityWeek {
 interface ActivityHeatMapProps {
     activity: CommitActivityWeek[];
     totalCommits: number;
+    hideFooter?: boolean;
 }
 
-const ActivityHeatMap: React.FC<ActivityHeatMapProps> = ({ activity, totalCommits }) => {
+const ActivityHeatMap: React.FC<ActivityHeatMapProps> = ({ activity, totalCommits, hideFooter }) => {
     // Generate the full grid for the last 52 weeks
     const grid = useMemo(() => {
         if (!activity || activity.length === 0) return null;
@@ -136,38 +137,40 @@ const ActivityHeatMap: React.FC<ActivityHeatMapProps> = ({ activity, totalCommit
 
 
             {/* Legend / Info Footer */}
-            <div className="pt-6 border-t border-white/5 space-y-6 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                        <span className="text-[11px] font-black text-white uppercase tracking-wider">
-                            Contribution Analysis
-                        </span>
+            {!hideFooter && (
+                <div className="pt-6 border-t border-white/5 space-y-6 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                            <span className="text-[11px] font-black text-white uppercase tracking-wider">
+                                Contribution Analysis
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-white/40 font-medium pl-3.5 italic">
+                            {totalCommits} significant commits identified in the last year
+                        </p>
                     </div>
-                    <p className="text-[10px] text-white/40 font-medium pl-3.5 italic">
-                        {totalCommits} significant commits identified in the last year
-                    </p>
-                </div>
 
-                <div className="flex flex-col sm:items-end gap-3">
-                    <div className="flex items-center gap-3 bg-white/[0.02] p-1.5 rounded-xl border border-white/5 self-start sm:self-auto">
-                        <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] px-2">Intensity</span>
-                        <div className="flex gap-[3px]">
-                            {[0, 1, 2, 3, 4].map(level => (
-                                <div
-                                    key={level}
-                                    className={`w-3 h-3 rounded-[2px] ${getColor(level)} border border-white/5 transition-transform hover:scale-125 hover:z-10`}
-                                />
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2 border-l border-white/5 ml-1">
-                            <span className="text-[9px] text-white/30 lowercase italic">less</span>
-                            <div className="w-1 h-1 rounded-full bg-white/10" />
-                            <span className="text-[9px] text-white/30 lowercase italic">more</span>
+                    <div className="flex flex-col sm:items-end gap-3">
+                        <div className="flex items-center gap-3 bg-white/[0.02] p-1.5 rounded-xl border border-white/5 self-start sm:self-auto">
+                            <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] px-2">Intensity</span>
+                            <div className="flex gap-[3px]">
+                                {[0, 1, 2, 3, 4].map(level => (
+                                    <div
+                                        key={level}
+                                        className={`w-3 h-3 rounded-[2px] ${getColor(level)} border border-white/5 transition-transform hover:scale-125 hover:z-10`}
+                                    />
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 border-l border-white/5 ml-1">
+                                <span className="text-[9px] text-white/30 lowercase italic">less</span>
+                                <div className="w-1 h-1 rounded-full bg-white/10" />
+                                <span className="text-[9px] text-white/30 lowercase italic">more</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

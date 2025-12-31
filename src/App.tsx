@@ -95,10 +95,17 @@ export default function App() {
     const [isCheckingConnection, setIsCheckingConnection] = useState(true);
     const [showConnectModal, setShowConnectModal] = useState(false);
 
-    // Projects state
+    // Projects state - Parse initial project from URL first, then sessionStorage
     const [projects, setProjects] = useState<DiscoveredRepo[]>([]);
     const [selectedProject, setSelectedProject] = useState<string | null>(() => {
-        // Restore from sessionStorage on mount
+        // First try to get from URL
+        const path = window.location.pathname;
+        const parts = path.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+            // owner/repo format
+            return `${parts[0]}/${parts[1]}`;
+        }
+        // Fallback to sessionStorage
         return sessionStorage.getItem('selectedProject') || null;
     });
     const [analyzingProject, setAnalyzingProject] = useState<string | null>(null);
@@ -113,12 +120,33 @@ export default function App() {
     // This forces all child components to refetch their data
     const [projectVersion, setProjectVersion] = useState(0);
 
-    // UI state
-    const [activeTab, setActiveTab] = useState('projects');
+    // UI state - Parse initial tab from URL to avoid race condition
+    const [activeTab, setActiveTab] = useState(() => {
+        const path = window.location.pathname;
+        if (path === '/' || path === '/projects') {
+            return 'projects';
+        }
+        const parts = path.split('/').filter(Boolean);
+        if (parts.length >= 3) {
+            const tab = parts[2];
+            if (navItems.find(n => n.id === tab)) {
+                return tab;
+            }
+        } else if (parts.length === 1) {
+            const tab = parts[0];
+            if (navItems.find(n => n.id === tab)) {
+                return tab;
+            }
+        }
+        return 'projects';
+    });
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isAnalysisReady, setIsAnalysisReady] = useState(true);
     const [isTabLoading, setIsTabLoading] = useState(false);
+
+    // Flag to prevent URL sync during initial load
+    const hasInitialized = useRef(false);
 
     // Tab-level cache: { "owner/repo": { "dashboard": data, "trajectory": data, ... } }
     const [tabCache, setTabCache] = useState<Record<string, Record<string, unknown>>>({});
@@ -147,34 +175,14 @@ export default function App() {
         }
     }, [activeTab, selectedProject]);
 
-    // URL parsing on initial load
+    // Sync URL when activeTab or selectedProject changes (skip first render)
     useEffect(() => {
-        const path = location.pathname;
-        if (path === '/' || path === '/projects') {
-            setActiveTab('projects');
-        } else {
-            // Parse /{owner}/{repo}/{tab} format (e.g., /owner/repo/overview)
-            const parts = path.split('/').filter(Boolean);
-            if (parts.length >= 3) {
-                // owner/repo/tab format
-                const projectName = `${parts[0]}/${parts[1]}`;
-                const tab = parts[2];
-                if (projectName && navItems.find(n => n.id === tab)) {
-                    setSelectedProject(projectName);
-                    setActiveTab(tab);
-                }
-            } else if (parts.length === 1) {
-                // Just a tab name without project
-                const tab = parts[0];
-                if (navItems.find(n => n.id === tab)) {
-                    setActiveTab(tab);
-                }
-            }
+        // Skip URL sync on first render - state is already initialized from URL
+        if (!hasInitialized.current) {
+            hasInitialized.current = true;
+            return;
         }
-    }, []); // Only on mount
 
-    // Sync URL when activeTab or selectedProject changes
-    useEffect(() => {
         if (activeTab === 'projects') {
             if (location.pathname !== '/projects') {
                 navigate('/projects', { replace: true });
@@ -220,7 +228,7 @@ export default function App() {
             const data = await res.json();
             if (data.isConnected) {
                 setConnection(data);
-                fetchProjects();
+                await fetchProjects(); // Wait for projects to load before showing UI
             } else {
                 setConnection(null);
             }

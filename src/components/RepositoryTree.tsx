@@ -254,7 +254,7 @@ export default function RepositoryTree({ projectId }: Props) {
             </div>
 
             {/* Tree View */}
-            <div className="max-h-[400px] overflow-y-auto custom-scrollbar bg-white/[0.02] rounded-lg border border-white/5 p-2">
+            <div className="w-full bg-white/[0.02] rounded-lg border border-white/5 p-2 flex-1">
                 {hierarchy.length > 0 ? (
                     hierarchy.map(node => (
                         <TreeNodeItem key={node.path} node={node} defaultExpanded={true} />
