@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-
-const API_BASE = 'http://localhost:8080';
+import { API_BASE } from '../config';
 
 interface UseLivePollingOptions {
     interval?: number; // polling interval in ms (default: 30000)
