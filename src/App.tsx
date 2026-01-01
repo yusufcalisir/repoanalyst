@@ -41,6 +41,7 @@ import RealDependencies from './components/RealDependencies';
 import RealConcentration from './components/RealConcentration';
 import RealTemporal from './components/RealTemporal';
 import ErrorBoundary from './components/ErrorBoundary';
+import PublicLanding from './components/PublicLanding';
 
 import { API_BASE } from './config';
 
@@ -184,7 +185,7 @@ export default function App() {
         }
 
         if (activeTab === 'projects') {
-            if (location.pathname !== '/projects') {
+            if (location.pathname !== '/projects' && location.pathname !== '/') {
                 navigate('/projects', { replace: true });
             }
         } else if (selectedProject && activeTab !== 'projects') {
@@ -213,8 +214,10 @@ export default function App() {
 
     // Check GitHub connection on mount
     useEffect(() => {
-        checkConnection();
-    }, []);
+        if (location.pathname !== '/') {
+            checkConnection();
+        }
+    }, [location.pathname]);
 
     // Close mobile menu on tab change
     useEffect(() => {
@@ -354,7 +357,11 @@ export default function App() {
         setIsTabLoading(loading);
     }, []);
 
-    // Loading state
+    // Loading state - but NOT on the landing page
+    if (location.pathname === '/') {
+        return <PublicLanding />;
+    }
+
     if (isCheckingConnection) {
         return <TacticalLoader />;
     }

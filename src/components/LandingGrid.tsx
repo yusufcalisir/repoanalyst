@@ -4,6 +4,7 @@ import {
     FolderKanban, LayoutDashboard, Map, History,
     Files, GitBranch, Activity, Clock
 } from 'lucide-react';
+import BespokeGhostUI from './BespokeGhostUI';
 
 interface LandingGridProps {
     onConnect: () => void;
@@ -25,63 +26,53 @@ export default function LandingGrid({ onConnect }: LandingGridProps) {
         <div className="w-full relative pt-1 md:pt-2">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.02),transparent)] pointer-events-none" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-[1600px] relative z-10">
-                {tiles.map((tile, index) => (
-                    <motion.div
-                        key={tile.id}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.06 }}
-                        className="glass-panel border border-white/5 p-6 rounded-3xl h-[280px] flex flex-col justify-between group hover:border-white/20 transition-all cursor-default relative overflow-hidden"
-                    >
-                        {/* Ghost UI Background Element */}
-                        <div className="absolute -bottom-4 -right-4 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity pointer-events-none">
-                            <tile.icon size={120} strokeWidth={1} />
-                        </div>
+                {tiles.map((tile, index) => {
+                    const colorMap: Record<string, string> = {
+                        projects: 'indigo',
+                        overview: 'blue',
+                        'risk-map': 'emerald',
+                        history: 'violet',
+                        impact: 'rose',
+                        dependencies: 'orange',
+                        concentration: 'amber',
+                        temporal: 'red'
+                    };
+                    const activeColor = colorMap[tile.id] || 'blue';
 
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 group-hover:bg-risk-high/10 group-hover:border-risk-high/20 transition-all">
-                                    <tile.icon size={20} className="text-white/40 group-hover:text-risk-high transition-colors" />
-                                </div>
-                                <h3 className="font-bold text-lg text-white tracking-tight">{tile.title}</h3>
-                            </div>
-
-                            <div className="space-y-6">
-                                <p className="text-sm text-white/30 leading-relaxed font-medium">
-                                    {tile.desc}
-                                </p>
-
-                                {/* Inactive Panel "Ghost" Graphics */}
-                                <div className="space-y-3">
-                                    <div className="flex items-end gap-1 h-12 opacity-10">
-                                        {[...Array(12)].map((_, i) => (
-                                            <motion.div
-                                                key={i}
-                                                animate={{
-                                                    height: [10, 20 + Math.random() * 20, 10],
-                                                }}
-                                                transition={{
-                                                    duration: 2,
-                                                    repeat: Infinity,
-                                                    delay: i * 0.1
-                                                }}
-                                                className="flex-1 bg-white rounded-t-sm"
-                                            />
-                                        ))}
+                    return (
+                        <motion.div
+                            key={tile.id}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.06 }}
+                            className="glass-panel border border-white/5 p-6 rounded-3xl h-[280px] flex flex-col justify-between group hover:border-white/20 transition-all cursor-default relative overflow-hidden"
+                        >
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className={`p-2.5 rounded-xl bg-white/5 border border-white/5 group-hover:bg-${activeColor}-500/10 group-hover:border-${activeColor}-500/20 transition-all shadow-[0_0_15px_transparent] group-hover:shadow-${activeColor}-500/5`}>
+                                        <tile.icon size={20} className={`text-white/40 group-hover:text-${activeColor}-400 transition-colors`} />
                                     </div>
-                                    <div className="flex gap-3 opacity-20">
-                                        <div className="h-2 w-16 bg-white/10 rounded-full" />
-                                        <div className="h-2 w-10 bg-white/10 rounded-full" />
+                                    <h3 className="font-bold text-lg text-white tracking-tight">{tile.title}</h3>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <p className="text-sm text-white/30 leading-relaxed font-medium">
+                                        {tile.desc}
+                                    </p>
+
+                                    {/* Inactive Panel "Ghost" Graphics */}
+                                    <div className="h-16 flex items-center justify-between w-full pr-4">
+                                        <BespokeGhostUI type={tile.id} />
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="relative z-10">
-                            <div className="pt-4 border-t border-white/5" />
-                        </div>
-                    </motion.div>
-                ))}
+                            <div className="relative z-10">
+                                <div className="pt-4 border-t border-white/5" />
+                            </div>
+                        </motion.div>
+                    );
+                })}
             </div>
         </div>
     );

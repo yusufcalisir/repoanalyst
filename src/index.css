@@ -10,11 +10,8 @@
         --border: 57 57 60;
     }
 
-    html,
-    body {
-        overflow-x: hidden;
-        width: 100%;
-        position: relative;
+    html {
+        scroll-behavior: smooth;
     }
 
     body {
@@ -22,6 +19,11 @@
         color: #e1e2e4;
         @apply antialiased;
         font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+
+    ::selection {
+        background-color: rgba(99, 102, 241, 0.3);
+        color: white;
     }
 }
 
