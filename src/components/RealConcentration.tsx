@@ -12,6 +12,7 @@ import {
     ShieldAlert
 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
+import AIConcentrationReasoning from './AIConcentrationReasoning';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -201,7 +202,7 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
                     <div className="flex-1 flex flex-col justify-center">
                         {data.ownershipRisk?.riskLevel === 'Undetermined' ? (
                             <div className="flex flex-col gap-2">
-                                <div className="text-2xl md:text-3xl font-black text-white/40 leading-none">—</div>
+                                <div className="text-2xl md:text-3xl font-black text-white/40 leading-none">-</div>
                                 <div className="text-xs md:text-sm font-bold text-white/30 uppercase tracking-tight">Insufficient Data</div>
                             </div>
                         ) : (
@@ -229,6 +230,12 @@ export default function RealConcentration({ projectId, onLoadingChange }: Props)
                     )}
                 </div>
             </div>
+
+            {/* AI Ownership & Bus Factor Reasoning - Collapsible, only when AI connected */}
+            <AIConcentrationReasoning
+                projectId={projectId}
+                data={data}
+            />
 
             {/* Hotspots & Ownership List */}
             <div className="flex flex-col gap-6 w-full">

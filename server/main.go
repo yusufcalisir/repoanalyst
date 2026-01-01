@@ -6472,6 +6472,938 @@ func generateJSON(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
+// ==================== AI ANALYST ====================
+
+// AIOverviewRequest represents the API request
+type AIOverviewRequest struct {
+	Project  string `json:"project"`
+	Provider string `json:"provider"`
+	APIKey   string `json:"apiKey"`
+}
+
+// AIOverviewResponse represents the synthesized response
+type AIOverviewResponse struct {
+	Success     bool                `json:"success"`
+	Overview    string              `json:"overview,omitempty"`
+	Sections    *AIOverviewSections `json:"sections,omitempty"`
+	MissingData []string            `json:"missingData,omitempty"`
+	Error       string              `json:"error,omitempty"`
+}
+
+type AIOverviewSections struct {
+	SystemType         string `json:"systemType"`
+	RiskSources        string `json:"riskSources"`
+	RiskClassification string `json:"riskClassification"`
+	SignalConvergence  string `json:"signalConvergence"`
+}
+
+func aiOverview(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(AIOverviewResponse{
+			Success: false,
+			Error:   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context using existing pattern
+	owner, repo, _, foundRepo, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(AIOverviewResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+
+	// Validate project matches
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(AIOverviewResponse{
+			Success: false,
+			Error:   "Project mismatch",
+		})
+		return
+	}
+
+	// Get cached analysis data from various endpoints
+	client := NewGitHubClient(githubToken)
+
+	// Aggregate analysis data for AI prompt
+	missingData := []string{}
+
+	// Check what data is available via cache
+	var hasTrajectory, hasTopology, hasImpact, hasDeps, hasConcentration, hasTemporal bool
+
+	if cached, ok := analysisCache.Get("trajectory", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysis, ok := resp["analysis"].(map[string]interface{}); ok {
+				if trajectory, ok := analysis["trajectory"].(map[string]interface{}); ok {
+					if avail, ok := trajectory["available"].(bool); ok && avail {
+						hasTrajectory = true
+					}
+				}
+			}
+		}
+	}
+
+	if cached, ok := analysisCache.Get("topology", projectKey); ok && cached != nil {
+		hasTopology = true
+	}
+
+	if cached, ok := analysisCache.Get("impact", projectKey); ok && cached != nil {
+		hasImpact = true
+	}
+
+	if cached, ok := analysisCache.Get("dependencies", projectKey); ok && cached != nil {
+		hasDeps = true
+	}
+
+	if cached, ok := analysisCache.Get("concentration", projectKey); ok && cached != nil {
+		hasConcentration = true
+	}
+
+	if cached, ok := analysisCache.Get("temporal", projectKey); ok && cached != nil {
+		hasTemporal = true
+	}
+
+	if !hasTrajectory {
+		missingData = append(missingData, "Risk Trajectory")
+	}
+	if !hasTopology {
+		missingData = append(missingData, "System Topology")
+	}
+	if !hasImpact {
+		missingData = append(missingData, "Impact Surface")
+	}
+	if !hasDeps {
+		missingData = append(missingData, "Dependencies")
+	}
+	if !hasConcentration {
+		missingData = append(missingData, "Concentration")
+	}
+	if !hasTemporal {
+		missingData = append(missingData, "Temporal Hotspots")
+	}
+
+	// Build analysis summary for AI
+	analysisSummary := buildAnalysisSummaryFromRepo(foundRepo, client, owner, repo)
+
+	// Generate AI overview (for now, return a structured deterministic summary)
+	// In production, this would call the actual AI provider API
+	overview := generateLocalOverview(analysisSummary, missingData)
+
+	json.NewEncoder(w).Encode(AIOverviewResponse{
+		Success:     true,
+		Overview:    overview,
+		MissingData: missingData,
+		Sections: &AIOverviewSections{
+			SystemType:         inferSystemTypeSimple(hasDeps, hasTopology),
+			RiskSources:        identifyRiskSourcesSimple(hasTrajectory, hasConcentration, hasTemporal),
+			RiskClassification: classifyRisksSimple(hasDeps, hasConcentration),
+			SignalConvergence:  analyzeSignalConvergenceSimple(hasTrajectory, hasConcentration, hasTopology),
+		},
+	})
+}
+
+func buildAnalysisSummaryFromRepo(repo *DiscoveredRepo, client *GitHubClient, owner, repo_name string) string {
+	var sb strings.Builder
+
+	if repo != nil {
+		sb.WriteString(fmt.Sprintf("Repository: %s\n", repo.FullName))
+		sb.WriteString(fmt.Sprintf("Language: %s, Stars: %d\n", repo.Language, repo.Stars))
+	}
+
+	return sb.String()
+}
+
+func generateLocalOverview(summary string, missingData []string) string {
+	var sb strings.Builder
+
+	sb.WriteString("This repository exhibits characteristics of an actively maintained software project. ")
+
+	if len(missingData) > 0 {
+		sb.WriteString(fmt.Sprintf("Note: The following sections have insufficient data for complete analysis: %s. ", strings.Join(missingData, ", ")))
+	}
+
+	sb.WriteString("Based on the available metrics, the system shows a recognizable development pattern ")
+	sb.WriteString("with identifiable ownership distribution and dependency structures. ")
+	sb.WriteString("Further analysis would benefit from examining temporal patterns and change velocity trends ")
+	sb.WriteString("to establish a complete risk profile.")
+
+	return sb.String()
+}
+
+func inferSystemTypeSimple(hasDeps, hasTopology bool) string {
+	if hasDeps {
+		return "Multi-dependency application with third-party integrations"
+	}
+	if hasTopology {
+		return "Modular system with identifiable structural patterns"
+	}
+	return "Standard application with typical architectural patterns"
+}
+
+func identifyRiskSourcesSimple(hasTrajectory, hasConcentration, hasTemporal bool) string {
+	risks := []string{}
+
+	if hasConcentration {
+		risks = append(risks, "ownership patterns detected")
+	}
+
+	if hasTrajectory {
+		risks = append(risks, "trajectory data available")
+	}
+
+	if hasTemporal {
+		risks = append(risks, "temporal patterns identified")
+	}
+
+	if len(risks) == 0 {
+		return "No dominant risk sources identified from available metrics"
+	}
+
+	return fmt.Sprintf("Analysis dimensions: %s", strings.Join(risks, ", "))
+}
+
+func classifyRisksSimple(hasDeps, hasConcentration bool) string {
+	structural := []string{}
+
+	if hasConcentration {
+		structural = append(structural, "contributor analysis")
+	}
+
+	if hasDeps {
+		structural = append(structural, "dependency mapping")
+	}
+
+	if len(structural) == 0 {
+		return "Risk classification requires additional data points"
+	}
+	return fmt.Sprintf("Available for: %s", strings.Join(structural, ", "))
+}
+
+func analyzeSignalConvergenceSimple(hasTrajectory, hasConcentration, hasTopology bool) string {
+	signals := 0
+
+	if hasTrajectory {
+		signals++
+	}
+	if hasConcentration {
+		signals++
+	}
+	if hasTopology {
+		signals++
+	}
+
+	if signals == 0 {
+		return "Insufficient signals for convergence analysis"
+	}
+
+	if signals >= 3 {
+		return "Multiple risk dimensions available for cross-correlation"
+	} else if signals >= 2 {
+		return "Partial signal coverage - limited convergence analysis possible"
+	}
+	return "Single dimension available - convergence analysis not applicable"
+}
+
+// aiAnalysisInterpretation provides AI interpretation of dashboard metrics
+func aiAnalysisInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, foundRepo, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached dashboard data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for dashboard data
+	if cached, ok := analysisCache.Get("dashboard", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysis, ok := resp["analysis"].(*RepoAnalysis); ok && analysis != nil {
+				// Activity interpretation
+				if analysis.ActivityScore < 3 && analysis.DaysSinceLastPush > 30 {
+					insights = append(insights, "The combination of low activity and extended time since the last push suggests this repository may be in maintenance mode. This is common for stable, mature projects but warrants attention if active development is expected.")
+				} else if analysis.ActivityScore >= 7 {
+					insights = append(insights, "Recent activity patterns indicate active development with consistent engagement and fresh commits.")
+				}
+
+				// Contributor concentration
+				if analysis.ContributorCount == 1 {
+					insights = append(insights, "Single-contributor ownership represents a structural consideration for continuity planning. All institutional knowledge resides with one individual.")
+				} else if analysis.ContributorCount <= 2 && analysis.FileCount > 50 {
+					insights = append(insights, "The ratio of contributors to codebase size indicates concentrated ownership, which may create bottlenecks during review cycles.")
+				}
+
+				// Dependency context
+				if analysis.DependencyCount > 50 {
+					insights = append(insights, "The dependency count suggests significant reliance on third-party packages, increasing supply chain considerations.")
+				}
+
+				// Doc Drift
+				if analysis.DocDrift != nil && analysis.DocDrift.Available {
+					if analysis.DocDrift.Classification == "Code-leading" {
+						insights = append(insights, "Documentation appears to lag behind code changes, which may affect onboarding clarity for new contributors.")
+					}
+				} else {
+					warnings = append(warnings, "Documentation drift data unavailable")
+				}
+
+				// Volatility
+				if analysis.Volatility != nil && analysis.Volatility.Available {
+					if analysis.Volatility.Classification == "High" {
+						insights = append(insights, "Commit patterns show irregular clustering, suggesting sprint-based development or burst contributions.")
+					}
+				} else {
+					warnings = append(warnings, "Volatility analysis unavailable")
+				}
+			}
+		}
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, fmt.Sprintf("The available metrics for %s present a standard profile without notable anomalies. The current state appears consistent with expected values for a repository of this scale.", foundRepo.Name))
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
+// aiTopologyInterpretation provides AI interpretation of topology structure
+func aiTopologyInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, _, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached topology data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for topology data
+	if cached, ok := analysisCache.Get("topology", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			// Extract metrics
+			if metricsRaw, ok := resp["metrics"]; ok {
+				if metrics, ok := metricsRaw.(TopologyMetrics); ok {
+					// Entropy interpretation
+					if metrics.EntropyDensity == "High" {
+						insights = append(insights, "High entropy density indicates uneven distribution of code responsibility. This pattern often emerges from organic growth where certain areas accumulate more functionality over time.")
+					} else if metrics.EntropyDensity == "Low" {
+						insights = append(insights, "Low entropy density suggests relatively even distribution of code across detected domains, indicating intentional modular design or balanced evolution.")
+					}
+
+					// Debt status
+					if metrics.CascadingDebtStatus == "Active" {
+						insights = append(insights, "Active cascading debt status indicates that structural dependencies may propagate technical debt across domain boundaries.")
+					}
+
+					// Risk index
+					if metrics.RegionalRiskIndex >= 75 {
+						insights = append(insights, "The aggregate risk index across domains is elevated, suggesting systemic factors rather than isolated problem areas.")
+					}
+				}
+			}
+
+			// Extract clusters
+			if clustersRaw, ok := resp["clusters"]; ok {
+				if clusters, ok := clustersRaw.([]TopologyCluster); ok && len(clusters) > 0 {
+					criticalCount := 0
+					for _, c := range clusters {
+						if c.RiskLevel == "Critical" || c.RiskLevel == "High" {
+							criticalCount++
+						}
+					}
+					if criticalCount > 0 {
+						insights = append(insights, fmt.Sprintf("%d domain cluster(s) show elevated risk indices, indicating concentrated complexity in specific areas.", criticalCount))
+					}
+				}
+			}
+		}
+	} else {
+		warnings = append(warnings, "Topology data not cached; interpretation based on limited information")
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, "The topology presents a standard structural profile. No anomalous patterns were identified that would warrant specific architectural commentary.")
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
+// aiTrajectoryInterpretation provides AI interpretation of risk trajectory
+func aiTrajectoryInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, _, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached trajectory data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for trajectory data
+	if cached, ok := analysisCache.Get("trajectory", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysisRaw, ok := resp["analysis"].(map[string]interface{}); ok {
+				if trajectoryRaw, ok := analysisRaw["trajectory"]; ok {
+					if trajectory, ok := trajectoryRaw.(*TrajectoryAnalysis); ok && trajectory != nil {
+						// Velocity interpretation
+						if trajectory.VelocityFactor > 1.5 {
+							insights = append(insights, fmt.Sprintf("The velocity factor of %.1fx indicates accelerating change rate. Sustained acceleration without stabilization periods can compound technical obligations.", trajectory.VelocityFactor))
+						} else if trajectory.VelocityFactor < 0.5 {
+							insights = append(insights, fmt.Sprintf("The velocity factor of %.1fx suggests decelerating change rate, reflecting reduced development activity or intentional consolidation.", trajectory.VelocityFactor))
+						}
+
+						// Trend interpretation
+						if trajectory.OverallTrend == "increasing_risk" {
+							insights = append(insights, "The overall trajectory indicates an upward trend in risk metrics, typically reflecting accumulating complexity or increased churn velocity.")
+						} else if trajectory.OverallTrend == "decreasing_risk" {
+							insights = append(insights, "The trajectory shows a downward trend in risk metrics, suggesting stabilization or active debt reduction.")
+						}
+
+						// Peak risk
+						if trajectory.PeakRiskScore > 0 && trajectory.PeakRiskWeek != "" {
+							insights = append(insights, fmt.Sprintf("Peak risk of %.0f occurred during week %s. The relationship between peak and current levels indicates whether elevated periods were transient.", trajectory.PeakRiskScore, trajectory.PeakRiskWeek))
+						}
+
+						// Confidence
+						if trajectory.ConfidenceLevel == "Low" {
+							warnings = append(warnings, "Low confidence level indicates sparse or irregular activity data")
+						}
+					}
+				}
+			}
+		}
+	} else {
+		warnings = append(warnings, "Trajectory data not cached; interpretation based on limited information")
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, "The risk trajectory presents a standard evolution pattern. No anomalous momentum or inflection points were identified.")
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
+// aiImpactInterpretation provides AI interpretation of impact surface
+func aiImpactInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, _, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached impact data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for impact data
+	if cached, ok := analysisCache.Get("impact", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysisRaw, ok := resp["analysis"].(map[string]interface{}); ok {
+				if impactRaw, ok := analysisRaw["impact"]; ok {
+					if impact, ok := impactRaw.(*ImpactAnalysis); ok && impact != nil {
+						// Most fragile vs largest blast
+						if impact.MostFragile != "" && impact.LargestBlast != "" {
+							if impact.MostFragile != impact.LargestBlast {
+								insights = append(insights, fmt.Sprintf("The most fragile unit (%s) differs from the largest blast radius (%s). This separation indicates structural complexity and systemic reach are not concentrated in the same place.", impact.MostFragile, impact.LargestBlast))
+							} else {
+								insights = append(insights, fmt.Sprintf("The %s unit is both the most fragile and has the largest blast radius. This concentration means the most structurally sensitive code also has the widest potential impact.", impact.MostFragile))
+							}
+						}
+
+						// Severity distribution
+						totalHighRisk := impact.CriticalCount + impact.HighCount
+						totalUnits := len(impact.ImpactUnits)
+						if totalUnits > 0 && float64(totalHighRisk)/float64(totalUnits) > 0.5 {
+							insights = append(insights, "Over half of the impact units are classified at critical or high fragility, suggesting systemic structural stress rather than isolated problem areas.")
+						}
+
+						// Check for cyclic dependencies
+						cyclicCount := 0
+						for _, unit := range impact.ImpactUnits {
+							if unit.IsCyclic {
+								cyclicCount++
+							}
+						}
+						if cyclicCount > 0 {
+							insights = append(insights, fmt.Sprintf("%d impact unit(s) participate in cyclic dependencies. Cycles create bidirectional impact pathways where changes can echo back through the dependency graph.", cyclicCount))
+						}
+					}
+				}
+			}
+		}
+	} else {
+		warnings = append(warnings, "Impact data not cached; interpretation based on limited information")
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, "The impact surface presents a standard distribution. No anomalous risk-impact relationships were identified.")
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
+// aiDependencyInterpretation provides AI interpretation of dependency patterns
+func aiDependencyInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, _, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached dependency data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for dependency data
+	if cached, ok := analysisCache.Get("dependencies", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysisRaw, ok := resp["analysis"].(map[string]interface{}); ok {
+				if depsRaw, ok := analysisRaw["deps"]; ok {
+					if deps, ok := depsRaw.(*DependencyAnalysis); ok && deps != nil {
+						// Cyclic nodes
+						if deps.CyclicNodes > 0 {
+							cyclicPct := float64(deps.CyclicNodes) / float64(len(deps.Nodes)) * 100
+							insights = append(insights, fmt.Sprintf("%d nodes (%.0f%%) participate in cyclic dependencies. Cycles create bidirectional risk pathways.", deps.CyclicNodes, cyclicPct))
+						}
+
+						// High centrality nodes
+						highCentrality := 0
+						for _, n := range deps.Nodes {
+							if n.Centrality >= 0.3 {
+								highCentrality++
+							}
+						}
+						if highCentrality > 0 {
+							insights = append(insights, fmt.Sprintf("%d nodes function as structural anchors with high centrality. Changes to these nodes would ripple widely.", highCentrality))
+						}
+
+						// Edge density
+						if len(deps.Nodes) > 0 && deps.TotalEdges > 0 {
+							avgEdges := float64(deps.TotalEdges) / float64(len(deps.Nodes))
+							if avgEdges > 3 {
+								insights = append(insights, fmt.Sprintf("The dependency graph shows dense interconnection (%.1f edges per node on average).", avgEdges))
+							}
+						}
+					}
+				}
+			}
+		}
+	} else {
+		warnings = append(warnings, "Dependency data not cached; interpretation based on limited information")
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, "The dependency structure presents a standard graph. No unusual structural patterns or decision-relevant signals were identified.")
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
+// aiConcentrationInterpretation provides AI interpretation of ownership and bus factor
+func aiConcentrationInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, _, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached concentration data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for concentration data
+	if cached, ok := analysisCache.Get("concentration", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysisRaw, ok := resp["analysis"].(map[string]interface{}); ok {
+				if concRaw, ok := analysisRaw["concentration"]; ok {
+					if conc, ok := concRaw.(*ConcentrationAnalysis); ok && conc != nil {
+						// Bus factor interpretation
+						if conc.OwnershipRisk != nil {
+							busFactor := conc.OwnershipRisk.BusFactor
+							totalContribs := conc.OwnershipRisk.TotalContributors
+
+							if busFactor == 1 && totalContribs == 1 {
+								insights = append(insights, "This repository has a single contributor, which inherently results in a bus factor of 1. For solo projects, this reflects team size reality rather than an architectural concern.")
+							} else if busFactor == 1 && totalContribs > 1 {
+								insights = append(insights, fmt.Sprintf("Despite having %d contributors, the bus factor remains at 1. Critical knowledge is concentrated with a single individual.", totalContribs))
+							} else if busFactor >= 2 {
+								insights = append(insights, fmt.Sprintf("A bus factor of %d suggests knowledge is distributed across a core team. This provides operational redundancy.", busFactor))
+							}
+
+							// Dominant contributor
+							if conc.OwnershipRisk.DominantContributor != "" && conc.OwnershipRisk.DominantOwnership > 50 {
+								insights = append(insights, fmt.Sprintf("%s holds %d%% of the ownership surface. This concentration may represent intentional technical leadership.", conc.OwnershipRisk.DominantContributor, int(conc.OwnershipRisk.DominantOwnership)))
+							}
+						}
+
+						// Concentration index
+						if conc.ConcentrationIndex >= 70 {
+							insights = append(insights, fmt.Sprintf("The concentration index of %.0f%% indicates changes are highly focused in a small portion of the codebase.", conc.ConcentrationIndex))
+						}
+					}
+				}
+			}
+		}
+	} else {
+		warnings = append(warnings, "Concentration data not cached; interpretation based on limited information")
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, "The concentration and ownership patterns present a standard profile. No unusual patterns were identified.")
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
+// aiTemporalInterpretation provides AI interpretation of temporal hotspots
+func aiTemporalInterpretation(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	provider := r.URL.Query().Get("provider")
+	projectId := r.URL.Query().Get("project")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if provider == "" || projectId == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing provider or project parameter",
+		})
+		return
+	}
+
+	// Get current project context
+	owner, repo, _, _, err := getSelectedProjectContext()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	projectKey := owner + "/" + repo
+	if projectKey != projectId {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Project mismatch",
+		})
+		return
+	}
+
+	// Build interpretation based on cached temporal data
+	warnings := []string{}
+	insights := []string{}
+
+	// Check cache for temporal data
+	if cached, ok := analysisCache.Get("temporal", projectKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			if analysisRaw, ok := resp["analysis"].(map[string]interface{}); ok {
+				if tempRaw, ok := analysisRaw["temporal"]; ok {
+					if temp, ok := tempRaw.(*TemporalAnalysis); ok && temp != nil {
+						burstCount := 0
+						driftCount := 0
+						for _, h := range temp.TemporalHotspots {
+							if h.Classification == "burst" {
+								burstCount++
+							} else {
+								driftCount++
+							}
+						}
+
+						if burstCount > 0 && driftCount == 0 {
+							insights = append(insights, fmt.Sprintf("All %d detected hotspots are bursts—short-term, high-intensity activity. This pattern typically indicates deadline-driven development rather than chronic instability.", len(temp.TemporalHotspots)))
+						} else if driftCount > 0 && burstCount == 0 {
+							insights = append(insights, fmt.Sprintf("All %d hotspots show drift classification—sustained instability over extended periods. These areas may benefit from closer attention.", len(temp.TemporalHotspots)))
+						} else if burstCount > 0 && driftCount > 0 {
+							insights = append(insights, fmt.Sprintf("Mixed patterns detected: %d burst and %d drift hotspots. Different stability concerns in different areas.", burstCount, driftCount))
+						}
+
+						if temp.WindowDays < 30 {
+							warnings = append(warnings, fmt.Sprintf("Analysis window is %d days. Short windows may capture phase-specific activity.", temp.WindowDays))
+						}
+					}
+				}
+			}
+		}
+	} else {
+		warnings = append(warnings, "Temporal data not cached; interpretation based on limited information")
+	}
+
+	if len(insights) == 0 {
+		insights = append(insights, "No significant temporal patterns were detected. This may indicate stable, evenly distributed development activity.")
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"interpretation": strings.Join(insights, "\n\n"),
+		"warnings":       warnings,
+	})
+}
+
 // ==================== MAIN ====================
 
 func main() {
@@ -6529,6 +7461,16 @@ func main() {
 	http.HandleFunc("/api/analysis/busfactor", corsMiddleware(analysisBusFactor))
 	http.HandleFunc("/api/analysis/tree", corsMiddleware(analysisTree))
 	http.HandleFunc("/api/analysis/predictions", corsMiddleware(analysisPredictions))
+
+	// AI Analyst
+	http.HandleFunc("/api/ai/overview", corsMiddleware(aiOverview))
+	http.HandleFunc("/api/ai/analysis-interpretation", corsMiddleware(aiAnalysisInterpretation))
+	http.HandleFunc("/api/ai/topology-interpretation", corsMiddleware(aiTopologyInterpretation))
+	http.HandleFunc("/api/ai/trajectory-interpretation", corsMiddleware(aiTrajectoryInterpretation))
+	http.HandleFunc("/api/ai/impact-interpretation", corsMiddleware(aiImpactInterpretation))
+	http.HandleFunc("/api/ai/dependency-interpretation", corsMiddleware(aiDependencyInterpretation))
+	http.HandleFunc("/api/ai/concentration-interpretation", corsMiddleware(aiConcentrationInterpretation))
+	http.HandleFunc("/api/ai/temporal-interpretation", corsMiddleware(aiTemporalInterpretation))
 
 	// Health check endpoint for cron jobs (lightweight, no DB load)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

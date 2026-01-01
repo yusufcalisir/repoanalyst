@@ -15,6 +15,7 @@ import {
     FileCode
 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
+import AIImpactReasoning from './AIImpactReasoning';
 
 import { API_BASE } from '../config';
 
@@ -184,6 +185,12 @@ export default function RealImpact({ projectId, onLoadingChange }: Props) {
                     )}
                 </div>
             )}
+
+            {/* AI Risk vs Impact Reasoning - Collapsible, only when AI connected */}
+            <AIImpactReasoning
+                projectId={projectId}
+                impact={impact}
+            />
 
             {/* Impact Units */}
             <div className="space-y-3">

@@ -13,6 +13,7 @@ import {
     CheckCircle
 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
+import AIDependencyReasoning from './AIDependencyReasoning';
 
 import { API_BASE } from '../config';
 
@@ -174,6 +175,13 @@ export default function RealDependencies({ projectId, onLoadingChange }: Props) 
                     </div>
                 );
             })()}
+
+            {/* AI Dependency Decision Support - Collapsible, only when AI connected */}
+            <AIDependencyReasoning
+                projectId={projectId}
+                deps={deps}
+                manifestDeps={manifestDeps}
+            />
 
             {/* Direct Manifest Dependencies */}
             {manifestDeps.length > 0 && (

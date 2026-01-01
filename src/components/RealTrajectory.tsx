@@ -12,6 +12,7 @@ import {
     Info
 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
+import AITrajectoryInterpretation from './AITrajectoryInterpretation';
 
 import { API_BASE } from '../config';
 
@@ -289,6 +290,12 @@ export default function RealTrajectory({ projectId, onLoadingChange }: Props) {
                     icon={TrendingUp}
                 />
             </div>
+
+            {/* AI Predictive Interpretation - Collapsible, only when AI connected */}
+            <AITrajectoryInterpretation
+                projectId={projectId}
+                trajectory={trajectory}
+            />
 
             {/* Context */}
             <div className="glass-panel rounded-3xl p-6 border border-white/10 flex items-center gap-6">

@@ -10,6 +10,7 @@ import {
     Search
 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
+import AITemporalReasoning from './AITemporalReasoning';
 
 import { API_BASE } from '../config';
 
@@ -143,6 +144,12 @@ export default function RealTemporal({ projectId, onLoadingChange }: Props) {
                     <div className="text-[10px] text-white/40 mt-1 font-medium truncate">Rolling temporal scan depth</div>
                 </div>
             </div>
+
+            {/* AI Temporal Pattern Interpretation - Collapsible, only when AI connected */}
+            <AITemporalReasoning
+                projectId={projectId}
+                data={data}
+            />
 
             {/* Hotspots Grid */}
             <div className="grid grid-cols-1 gap-4">

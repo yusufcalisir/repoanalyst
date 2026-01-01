@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -10,7 +10,7 @@ import {
     Clock,
     ChevronLeft,
     ChevronRight,
-
+    Brain,
     Github,
     LogOut,
     FolderKanban,
@@ -42,6 +42,8 @@ import RealConcentration from './components/RealConcentration';
 import RealTemporal from './components/RealTemporal';
 import ErrorBoundary from './components/ErrorBoundary';
 import PublicLanding from './components/PublicLanding';
+import AIAnalystConfig from './components/AIAnalystConfig';
+import GlobalAIOverview from './components/GlobalAIOverview';
 
 import { API_BASE } from './config';
 
@@ -72,7 +74,7 @@ interface DiscoveredRepo {
     analysisState: string;
 }
 
-const navItems = [
+const baseNavItems = [
     { id: 'projects', label: 'Projects', icon: FolderKanban },
     { id: 'analysis', label: 'Analysis', icon: LayoutDashboard },
     { id: 'risk-map', label: 'System Topology', icon: Map },
@@ -82,6 +84,8 @@ const navItems = [
     { id: 'concentration', label: 'Concentration', icon: Activity },
     { id: 'temporal', label: 'Temporal Hotspots', icon: Clock },
 ];
+
+const aiNavItem = { id: 'ai-analyst', label: 'AI Analyst', icon: Brain };
 
 export default function App() {
 
@@ -145,6 +149,32 @@ export default function App() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isAnalysisReady, setIsAnalysisReady] = useState(true);
     const [isTabLoading, setIsTabLoading] = useState(false);
+
+    // AI connection state - tracks if AI provider is connected
+    const [aiConnected, setAiConnected] = useState(() => !!localStorage.getItem('repoanalyst_ai_provider'));
+
+    // Dynamic navigation items - includes AI Analyst tab when connected
+    const navItems = useMemo(() => {
+        const items = [...baseNavItems];
+        if (aiConnected) {
+            items.push(aiNavItem);
+        }
+        return items;
+    }, [aiConnected]);
+
+    // Listen for AI connection changes via storage event
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setAiConnected(!!localStorage.getItem('repoanalyst_ai_provider'));
+        };
+        window.addEventListener('storage', handleStorageChange);
+        // Also check periodically for same-tab changes
+        const interval = setInterval(handleStorageChange, 1000);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(interval);
+        };
+    }, []);
 
     // Flag to prevent URL sync during initial load
     const hasInitialized = useRef(false);
@@ -444,6 +474,13 @@ export default function App() {
                 })}
             </nav>
 
+            {connection && (
+                <AIAnalystConfig
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    onActivate={() => setActiveTab('projects')}
+                />
+            )}
+
             <div className="p-4 border-t border-white/5 space-y-4 bg-surface/20">
 
                 {!connection ? (
@@ -645,6 +682,9 @@ export default function App() {
                                     )}
                                     {activeTab === 'temporal' && selectedProject && (
                                         <RealTemporal key={`temporal-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
+                                    )}
+                                    {activeTab === 'ai-analyst' && selectedProject && (
+                                        <GlobalAIOverview key={`ai-${projectVersion}`} projectId={selectedProject} onLoadingChange={handleTabLoadingChange} />
                                     )}
                                 </ErrorBoundary>
                             </motion.div>

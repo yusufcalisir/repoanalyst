@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Map, AlertCircle, Box, GitBranch, TrendingUp, Activity, Loader2 } from 'lucide-react';
 import ProjectContextHeader from './ProjectContextHeader';
+import AITopologyReasoning from './AITopologyReasoning';
 
 import { API_BASE } from '../config';
 
@@ -237,6 +238,14 @@ export default function RealTopology({ projectId, onLoadingChange }: Props) {
                 />
             </div>
 
+            {/* AI Structural Reasoning - Collapsible, only when AI connected */}
+            <AITopologyReasoning
+                projectId={projectId}
+                clusters={clusters}
+                metrics={metrics}
+                moduleCount={modules.length}
+                edgeCount={edges.length}
+            />
 
             {/* Clusters */}
             <div className="glass-panel rounded-2xl p-6">

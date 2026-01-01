@@ -96,7 +96,33 @@ RepoAnalyst is engineered for tactical deployment on any device.
 
 ---
 
-## 🧠 INTELLIGENCE LAYER | PRODUCTION-GRADE ANALYTICS
+## 🧠 INTELLIGENCE LAYER | AI-POWERED COGNITIVE PROTOCOL
+
+### 🤖 The AI Analyst Contract
+RepoAnalyst delivers high-fidelity, layered reasoning. Every interpretation follows a specific protocol to ensure technical depth without generic AI fluff.
+* **Insight Summary**: High-signal, 1-sentence analytical statements derived from aggregate data vectors.
+* **Structural Context**: Deep-dive explanations grounding the insight in your actual code topology.
+* **Forward Signal**: Predictive indicators highlighting future maintenance or reliability risks.
+
+### 🧩 Specialized Analytical Domains
+Our AI engine implements section-specific focus themes across the entire analysis pipeline:
+* **Systemic Patterns**: Detecting alignment or imbalance in overall development activity.
+* **Structural Stability**: Mapping coupling, entropy, and architectural fragility.
+* **Risk Trajectory**: Predicting direction and momentum of technical debt inflection points.
+* **Blast Radius**: Calculating amplification and containment of modular changes.
+* **Exposure Volatility**: Monitoring supply-chain pressure and dependency churn.
+* **Knowledge Redundancy**: Identifying bus-factor fragility and cognitive silos.
+* **Temporal Churn**: Detecting recurrence and unresolved motion in high-frequency zones.
+
+### ⚡ Cognitive Layer Protocol
+The integrated "Cognitive Layer" transforms raw metrics into an intentional narrative.
+* **Designed Narrative**: Implicit UI integration removes raw metric labels for a professional SaaS dashboard experience.
+* **Thematic Precision**: Language tailored specifically to the engineering domain (e.g., "blast radius", "structural entropy").
+* **Confident Synthesis**: Tone is professional, decisive, and restrained—optimized for elite engineering leaders.
+
+---
+
+## 🛰️ DATA INTEGRITY & OPS | PRODUCTION-GRADE ANALYTICS
 
 ### Deterministic Analysis Engine
 Every metric is reproducible and traceable. The same repository state always produces identical results.
@@ -110,23 +136,11 @@ Section-level performance attribution for diagnosing latency and bottlenecks.
 * **Cache Hit/Miss Tracking**: Understand when data is served from cache.
 * **Cold Start Detection**: Distinguish between fresh and warm execution.
 
-### Explainability Layer
-Every computed metric includes data-backed explanations.
-* **Traceable Metrics**: Hover or tap to see data sources, commit ranges, and computation logic.
-* **Contextual Insights**: Explanations change with the underlying data.
-* **Transparency First**: Users understand what they are seeing and why.
-
 ### Failure-Tolerant UX
 Graceful degradation without breaking the entire interface.
+* **AI Fallback Logic**: Local interpretation engine provides robust fallbacks if the AI provider is unavailable.
 * **Metric-Level Isolation**: Individual failures do not cascade.
 * **Explicit Unavailability**: Clear messaging when data is insufficient.
-* **Retry Affordance**: Users can recover from transient failures.
-
-### Data Integrity Contracts
-Strict validation before any metric is rendered.
-* **Required Sources Validation**: Metrics declare their dependencies.
-* **Completeness Thresholds**: Minimum data coverage enforced.
-* **Cross-Section Consistency**: Related metrics must agree.
 
 ### Progressive Disclosure
 Hierarchical information exposure reduces cognitive load.

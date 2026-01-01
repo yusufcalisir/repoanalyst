@@ -11,6 +11,7 @@ import ActivityHeatMap from './ActivityHeatMap';
 import ProjectContextHeader from './ProjectContextHeader';
 import RepositoryTree from './RepositoryTree';
 import RecommendationCard from './RecommendationCard';
+import AIAnalysisInterpretation from './AIAnalysisInterpretation';
 
 interface RepoMetadata {
     fullName: string;
@@ -445,6 +446,29 @@ export default function RealDashboard({ projectId, onLoadingChange, onTabChange 
                     icon={Package}
                 />
             </div>
+
+            {/* AI Interpretation Layer - Collapsible, only when AI connected */}
+            <AIAnalysisInterpretation
+                projectId={projectId}
+                repoName={repo.name}
+                language={metadata?.language || ''}
+                metrics={{
+                    activityScore: analysis.activityScore,
+                    stalenessScore: analysis.stalenessScore,
+                    teamRiskScore: analysis.teamRiskScore,
+                    contributorCount: analysis.contributorCount,
+                    dependencyCount: analysis.dependencyCount,
+                    fileCount: analysis.fileCount,
+                    directoryCount: analysis.directoryCount,
+                    commitsLast30Days: analysis.commitsLast30Days,
+                    commitsTrend: analysis.commitsTrend,
+                    repoAgeMonths: analysis.repoAgeMonths,
+                    daysSinceLastPush: analysis.daysSinceLastPush,
+                    docDrift: analysis.docDrift,
+                    volatility: analysis.volatility,
+                    structuralDepth: analysis.structuralDepth,
+                }}
+            />
 
             {/* Commit Activity - GitHub Style Heat Map */}
             <div className="glass-panel rounded-2xl p-6">
