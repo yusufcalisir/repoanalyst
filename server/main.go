@@ -4644,23 +4644,186 @@ func saveState() {
 	saveStateUnsafe()
 }
 
-// ==================== CORS ====================
+// ==================== SECURITY MIDDLEWARE ====================
 
+// Allowed origins for CORS (production + development)
+var allowedOrigins = map[string]bool{
+	"http://localhost:5173":           true,
+	"http://localhost:3000":           true,
+	"http://localhost:8080":           true,
+	"https://risksurface.vercel.app":  true,
+	"https://risk-surface.vercel.app": true,
+}
+
+// Rate limiting configuration
+var (
+	rateLimitMap    = make(map[string][]time.Time)
+	rateLimitMutex  sync.RWMutex
+	rateLimitPerMin = 120 // requests per minute per IP
+	rateLimitWindow = time.Minute
+)
+
+// getClientIP extracts the real client IP from request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (for proxies/load balancers)
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	// Check X-Real-IP header
+	xri := r.Header.Get("X-Real-IP")
+	if xri != "" {
+		return xri
+	}
+	// Fall back to RemoteAddr
+	ip := r.RemoteAddr
+	if colonIdx := strings.LastIndex(ip, ":"); colonIdx != -1 {
+		ip = ip[:colonIdx]
+	}
+	return ip
+}
+
+// checkRateLimit returns true if request is within rate limit
+func checkRateLimit(ip string) bool {
+	rateLimitMutex.Lock()
+	defer rateLimitMutex.Unlock()
+
+	now := time.Now()
+	windowStart := now.Add(-rateLimitWindow)
+
+	// Clean old entries and count recent requests
+	timestamps, exists := rateLimitMap[ip]
+	if !exists {
+		rateLimitMap[ip] = []time.Time{now}
+		return true
+	}
+
+	// Filter to only keep timestamps within the window
+	var validTimestamps []time.Time
+	for _, t := range timestamps {
+		if t.After(windowStart) {
+			validTimestamps = append(validTimestamps, t)
+		}
+	}
+
+	if len(validTimestamps) >= rateLimitPerMin {
+		rateLimitMap[ip] = validTimestamps
+		return false
+	}
+
+	rateLimitMap[ip] = append(validTimestamps, now)
+	return true
+}
+
+// cleanupRateLimitMap periodically cleans stale entries
+func cleanupRateLimitMap() {
+	for {
+		time.Sleep(5 * time.Minute)
+		rateLimitMutex.Lock()
+		windowStart := time.Now().Add(-rateLimitWindow)
+		for ip, timestamps := range rateLimitMap {
+			var valid []time.Time
+			for _, t := range timestamps {
+				if t.After(windowStart) {
+					valid = append(valid, t)
+				}
+			}
+			if len(valid) == 0 {
+				delete(rateLimitMap, ip)
+			} else {
+				rateLimitMap[ip] = valid
+			}
+		}
+		rateLimitMutex.Unlock()
+	}
+}
+
+// Maximum request body size (1MB)
+const maxRequestBodySize = 1 << 20 // 1MB
+
+// securityMiddleware wraps handlers with comprehensive security measures
+func securityMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// === 1. Rate Limiting ===
+		clientIP := getClientIP(r)
+		if !checkRateLimit(clientIP) {
+			log.Printf("[SECURITY] Rate limit exceeded for IP: %s", clientIP)
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+
+		// === 2. CORS with strict origin whitelist ===
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if allowedOrigins[origin] {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+			// If origin not in whitelist, don't set CORS headers (browser will block)
+		}
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+
+		// === 3. Security Headers ===
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		// CSP allows inline styles (needed for React) but restricts other resources
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https://api.github.com https://*.vercel.app;")
+
+		// === 4. Handle preflight ===
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// === 5. Request body size limit for POST/PUT ===
+		if r.Method == "POST" || r.Method == "PUT" {
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+		}
+
+		next(w, r)
+	}
+}
+
+// corsMiddleware is now an alias to securityMiddleware for backward compatibility
+func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return securityMiddleware(next)
+}
+
+// Deprecated: enableCORS is replaced by securityMiddleware
 func enableCORS(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	// Legacy function - kept for compatibility but now handled by securityMiddleware
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
 
-func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		enableCORS(w)
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next(w, r)
+// validateProjectPath ensures owner/repo names are safe (prevent path traversal)
+func validateProjectPath(owner, repo string) bool {
+	// Only allow alphanumeric, underscore, hyphen, and dot
+	validPattern := regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+	if !validPattern.MatchString(owner) || !validPattern.MatchString(repo) {
+		return false
 	}
+	// Prevent path traversal attempts
+	if strings.Contains(owner, "..") || strings.Contains(repo, "..") {
+		return false
+	}
+	// Length limits
+	if len(owner) > 100 || len(repo) > 100 {
+		return false
+	}
+	return true
+}
+
+// sendSecureError logs detailed error internally but returns generic message externally
+func sendSecureError(w http.ResponseWriter, code int, internalMsg string, externalMsg string) {
+	log.Printf("[ERROR] %s", internalMsg)
+	http.Error(w, externalMsg, code)
 }
 
 // ==================== HTTP HANDLERS ====================
@@ -6311,6 +6474,9 @@ func generateJSON(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	loadState()
+
+	// Start background rate limit cleanup goroutine
+	go cleanupRateLimitMap()
 
 	// Try to use env token on startup
 	if envToken := os.Getenv("GITHUB_TOKEN"); envToken != "" {
