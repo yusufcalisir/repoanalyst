@@ -1429,7 +1429,7 @@ func (c *GitHubClient) GetFileTree(owner, repo, branch string) (*GitHubTreeRespo
 // GitHub Stats API - returns weekly commit counts for last 52 weeks
 // Note: GitHub returns 202 when stats are being computed for the first time
 func (c *GitHubClient) GetCommitActivity(owner, repo string) ([]CommitActivityWeek, error) {
-	maxRetries := 3
+	maxRetries := 5
 	var body []byte
 	var status int
 	var err error
@@ -1446,8 +1446,9 @@ func (c *GitHubClient) GetCommitActivity(owner, repo string) ([]CommitActivityWe
 
 		// GitHub returns 202 when stats are being computed
 		if status == 202 {
-			log.Printf("[GitHub Stats] Commit activity is being computed (attempt %d/%d), waiting...", attempt+1, maxRetries)
-			time.Sleep(3 * time.Second)
+			waitTime := time.Duration(2+attempt) * time.Second // Progressive backoff: 2s, 3s, 4s, 5s, 6s
+			log.Printf("[GitHub Stats] Commit activity is being computed (attempt %d/%d), waiting %v...", attempt+1, maxRetries, waitTime)
+			time.Sleep(waitTime)
 			continue
 		}
 
@@ -1456,8 +1457,9 @@ func (c *GitHubClient) GetCommitActivity(owner, repo string) ([]CommitActivityWe
 	}
 
 	if status != 200 {
-		log.Printf("[GitHub Stats] Stats still not ready after %d attempts", maxRetries)
-		return nil, fmt.Errorf("commit activity not ready (status %d) - try again later", status)
+		log.Printf("[GitHub Stats] Stats still not ready after %d attempts - returning empty data", maxRetries)
+		// Return empty data instead of error - this allows the UI to show "no data" instead of error
+		return []CommitActivityWeek{}, nil
 	}
 
 	var activity []CommitActivityWeek
@@ -1870,7 +1872,7 @@ func analyzeTrajectory(client *GitHubClient, owner, repo string) *TrajectoryAnal
 	if len(commitActivity) == 0 {
 		return &TrajectoryAnalysis{
 			Available: false,
-			Reason:    "No commit history available",
+			Reason:    "GitHub is computing repository statistics. Please try again in a few moments.",
 			Snapshots: make([]TrajectorySnapshot, 0),
 		}
 	}
